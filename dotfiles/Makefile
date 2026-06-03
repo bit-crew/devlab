@@ -3,7 +3,6 @@ STOW_DIR = $(CURDIR)
 BIN_DIR = $(HOME)/.local/bin
 
 PACKAGES_CONFIG = ghostty helix zellij lazygit atuin
-PACKAGE_HOME = aider
 
 OS := $(shell uname -s | tr A-Z a-z)
 ARCH := $(shell uname -m)
@@ -56,12 +55,8 @@ install-tools: setup_dirs
 	@echo "Instalando Zoxide..."
 	@curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
 
-	@echo "Instalando dependencias de Python (Aider)..."
-	@if command -v pipx >/dev/null 2>&1; then \
-		pipx install aider-chat; \
-	elif command -v pip3 >/dev/null 2>&1; then \
-		pip3 install --user aider-chat; \
-	fi
+	@echo "Instalando Antigravity CLI (agy)..."
+	@curl -fsSL https://antigravity.google/cli/install.sh | bash
 
 install: install-tools deploy
 	@echo "Instalación completada. Asegúrate de añadir $(BIN_DIR) a tu PATH."
@@ -72,8 +67,6 @@ deploy: setup_dirs
 		echo "Stowing $$pkg to $(CONFIG_DIR)/$$pkg..."; \
 		stow -t $(CONFIG_DIR)/$$pkg -d $(STOW_DIR) $$pkg; \
 	done
-	@echo "Stowing $(PACKAGE_HOME) to $(HOME)..."
-	@stow -t $(HOME) -d $(STOW_DIR) $(PACKAGE_HOME)
 	@echo "Deployment complete."
 
 uninstall:
@@ -82,6 +75,4 @@ uninstall:
 		echo "Removing $$pkg..."; \
 		stow -D -t $(CONFIG_DIR)/$$pkg -d $(STOW_DIR) $$pkg; \
 	done
-	@echo "Removing $(PACKAGE_HOME)..."
-	@stow -D -t $(HOME) -d $(STOW_DIR) $(PACKAGE_HOME)
 	@echo "Uninstallation complete."

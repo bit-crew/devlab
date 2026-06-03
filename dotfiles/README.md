@@ -22,7 +22,6 @@ dotfiles/
 ├── zellij/            # Multiplexor de terminal
 ├── lazygit/           # Interfaz TUI para Git
 ├── atuin/             # Historial de comandos sincronizado y vitaminado
-├── aider/             # Configuración del agente de IA
 ├── Makefile           # Automatización de Instalación y Despliegue
 └── README.md          # Esta guía
 ```
@@ -33,10 +32,10 @@ dotfiles/
 
 Si en el futuro requieres administrar las configuraciones manualmente, el `Makefile` expone varios targets útiles:
 
-- `make install-tools`: Descarga e instala los programas binarios requeridos (Homebrew, Helix, Zellij, Lazygit, Ghostty, Zoxide, Atuin, Aider).
+- `make install-tools`: Descarga e instala los programas binarios requeridos (Homebrew, Helix, Zellij, Lazygit, Ghostty, Zoxide, Atuin, agy).
 - `make deploy`: Simplemente crea los enlaces de GNU Stow (útil tras agregar configuraciones nuevas o actualizar repositorios).
 - `make uninstall`: Elimina los enlaces de configuración (`stow -D`) revirtiendo tu sistema.
 
-## Gestión de Reglas IA Agnosticas
+## Gestión de Reglas IA con Antigravity CLI (agy)
 
-El archivo `.coder_rules.md` (ubicado dentro de la carpeta `aider`) contiene el **Manifesto de Reglas de Data Engineering**. Aunque se agrupa dentro de `aider`, las reglas de este archivo son totalmente agnósticas. Están diseñadas para guiar el comportamiento de cualquier IA que leas (ej. Aider, OpenCode, ClaudeCode, Cursor, Copilot CLI, Kiro, etc.) para que aplique de manera autónoma las mejores prácticas en PySpark, AWS, calidad de código y documentación.
+El entorno está preparado para integrarse con **Antigravity CLI (agy)**. Las reglas de Data Engineering están modularizadas en el proyecto `agent/` como skills (`architect`, `developer`, `migration`). Estas skills se cargan y vinculan automáticamente en el entorno del agente para guiar su comportamiento de manera autónoma en tareas de PySpark, AWS, calidad de código y diseño.
