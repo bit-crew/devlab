@@ -1,0 +1,4 @@
+auto-commits: false
+dark-mode: true
+model: anthropic/claude-3-7-sonnet-20250219
+message-instructions-file: ~/.coder_rules.md

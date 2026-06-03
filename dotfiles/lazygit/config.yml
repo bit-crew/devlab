@@ -1,0 +1,19 @@
+gui:
+  theme:
+    activeBorderColor:
+      - green
+      - bold
+    inactiveBorderColor:
+      - white
+    selectedLineBgColor:
+      - reverse
+  showIcons: true
+  commitLength:
+    show: true
+git:
+  paging:
+    colorArg: always
+    pager: delta --dark --paging=never --side-by-side --line-numbers
+update:
+  method: never
+  days: 14
