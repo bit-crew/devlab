@@ -1,7 +1,7 @@
-{ pkgs, ... }: {
-  home.username = "johanmarin"; # Ajustar según sea necesario
-  home.homeDirectory = "/home/johanmarin";
+{ pkgs, lib, config, configData, ... }: {
   home.stateVersion = "23.11";
+  home.username = configData.home.username;
+  home.homeDirectory = configData.home.homeDirectory;
 
   # Herramientas base en ambos sistemas
   home.packages = with pkgs; [
@@ -13,16 +13,20 @@
     fd
     bat
     fzf
+    eza
+    btop
+    tealdeer
     # Clipboard providers para Helix
     xclip
     wl-clipboard
-    
+
     # Language Servers (LSPs) & Formaters para Helix
     pyright
     ruff
     taplo
     yaml-language-server
     marksman
+    glow
   ];
 
   # Gestión declarativa de dotfiles mediante Home Manager
@@ -39,8 +43,8 @@
   # Configuración declarativa de programas comunes
   programs.git = {
     enable = true;
-    userName = "Johan Marin";
-    userEmail = "tu@email.com"; # Cambiar por el real en tu local (no subir a git)
+    userName = configData.git.userName;
+    userEmail = configData.git.userEmail;
     extraConfig = {
       init.defaultBranch = "main";
       core.editor = "hx";

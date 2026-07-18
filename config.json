@@ -1,0 +1,27 @@
+{
+  "git": {
+    "userName": "Your Name",
+    "userEmail": "your@email.com"
+  },
+  "home": {
+    "username": "your-username",
+    "homeDirectory": "/home/your-username"
+  },
+  "versions": {
+    "python": "3.12",
+    "jdk": "17",
+    "rust": "stable"
+  },
+  "agent": {
+    "repo": "https://github.com/jdmarinb/agent.git",
+    "kiro_home": "$HOME/.agent"
+  },
+  "secrets": {
+    "age_public_key": "age1...",
+    "files": {
+      "aws-credentials": "secrets/aws-credentials.age",
+      "github-token": "secrets/github-token.age",
+      "api-keys": "secrets/api-keys.age"
+    }
+  }
+}
