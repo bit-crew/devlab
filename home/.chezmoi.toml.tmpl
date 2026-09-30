@@ -1,7 +1,7 @@
 {{/* Config de chezmoi: pregunta perfil y datos de usuario en el primer init. */}}
 {{- $profile := promptStringOnce . "profile" "Perfil (dc1|vps)" "vps" -}}
-{{- $gitName := promptStringOnce . "gitName" "Nombre para git" -}}
-{{- $gitEmail := promptStringOnce . "gitEmail" "Email para git" -}}
+{{- $gitName := promptStringOnce . "gitName" "Nombre para git" "devlab" -}}
+{{- $gitEmail := promptStringOnce . "gitEmail" "Email para git" "devlab@localhost" -}}
 
 sourceDir = {{ .chezmoi.sourceDir | quote }}
 
