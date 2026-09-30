@@ -1,0 +1,47 @@
+{{/* ~/.zshrc generado por chezmoi. Perfil: {{ .profile }} */}}
+# ============================================
+#  zsh - perfil: {{ .profile }}
+# ============================================
+
+# Completion
+autoload -Uz compinit && compinit
+
+# Historia
+HISTSIZE=10000
+SAVEHIST=10000
+HISTFILE="$HOME/.zsh_history"
+setopt SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_SPACE
+
+# PATH: binarios de usuario y toolchains
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+
+# rustup / cargo
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
+# Aliases
+alias lg="lazygit"
+alias hx="helix"
+alias ls="eza"
+alias cat="bat"
+alias ..="cd .."
+
+# Editor por defecto
+export EDITOR="hx"
+export VISUAL="hx"
+
+# Integraciones (una linea = un eval, sin loops)
+command -v starship >/dev/null && eval "$(starship init zsh)"
+command -v zoxide   >/dev/null && eval "$(zoxide init zsh)"
+command -v atuin    >/dev/null && eval "$(atuin init zsh)"
+
+{{- if eq .profile "vps" }}
+
+# --- Solo VPS ---
+# Steering para agentes (Kiro, etc.)
+export KIRO_HOME="$HOME/{{ .agent.home }}"
+
+# Mantener el repo de steering actualizado en background (no bloquea el prompt)
+if [ -d "$KIRO_HOME/.git" ]; then
+  git -C "$KIRO_HOME" pull --ff-only --quiet 2>/dev/null &!
+fi
+{{- end }}

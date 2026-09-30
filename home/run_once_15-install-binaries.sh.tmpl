@@ -1,0 +1,177 @@
+#!/bin/sh
+# run_once: instala herramientas que NO estan en el apt oficial de Debian.
+# Corre despues de run_once_10 (rustup/uv/cargo ya disponibles).
+# chezmoi re-ejecuta este script solo si su contenido cambia.
+# Perfil: {{ .profile }}
+set -eu
+
+log() { printf '\033[1;34m[run_once:binaries]\033[0m %s\n' "$1"; }
+
+# Asegura cargo y ~/.local/bin en PATH para este script.
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+mkdir -p "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+
+# --- Herramientas Rust via cargo (ambos perfiles) ---
+# En apt no estan o van muy atrasadas. cargo compila la ultima version.
+# Se instalan solo si el binario no existe (idempotente).
+for tool in eza zoxide starship yazi-fm atuin; do
+    bin="$tool"
+    [ "$tool" = "yazi-fm" ] && bin="yazi"
+    if ! command -v "$bin" >/dev/null 2>&1; then
+        log "cargo install $tool..."
+        cargo install "$tool" || log "Fallo cargo install $tool (continuo)"
+    fi
+done
+
+# --- Helix: por binario oficial (compilar por cargo requiere fetch de grammars) ---
+if ! command -v hx >/dev/null 2>&1; then
+    log "Instalando Helix (binario oficial)..."
+    HELIX_VER="25.01.1"
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  HELIX_ARCH="x86_64" ;;
+        aarch64) HELIX_ARCH="aarch64" ;;
+        *)       HELIX_ARCH="" ;;
+    esac
+    if [ -n "$HELIX_ARCH" ]; then
+        TMP="$(mktemp -d)"
+        URL="https://github.com/helix-editor/helix/releases/download/${HELIX_VER}/helix-${HELIX_VER}-${HELIX_ARCH}-linux.tar.xz"
+        if curl -fsSL "$URL" -o "$TMP/helix.tar.xz"; then
+            tar -xf "$TMP/helix.tar.xz" -C "$TMP"
+            HELIX_DIR="$(find "$TMP" -maxdepth 1 -type d -name 'helix-*' | head -n1)"
+            mkdir -p "$HOME/.local/share"
+            rm -rf "$HOME/.local/share/helix-runtime"
+            cp -r "$HELIX_DIR/runtime" "$HOME/.local/share/helix-runtime"
+            cp "$HELIX_DIR/hx" "$HOME/.local/bin/hx"
+            chmod +x "$HOME/.local/bin/hx"
+            log "Helix instalado en ~/.local/bin/hx"
+        else
+            log "No se pudo descargar Helix $HELIX_VER (continuo)"
+        fi
+        rm -rf "$TMP"
+    else
+        log "Arquitectura $ARCH no soportada para Helix binario (continuo)"
+    fi
+fi
+
+# --- Zellij: por binario oficial ---
+if ! command -v zellij >/dev/null 2>&1; then
+    log "Instalando Zellij (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  Z_ARCH="x86_64-unknown-linux-musl" ;;
+        aarch64) Z_ARCH="aarch64-unknown-linux-musl" ;;
+        *)       Z_ARCH="" ;;
+    esac
+    if [ -n "$Z_ARCH" ]; then
+        TMP="$(mktemp -d)"
+        URL="https://github.com/zellij-org/zellij/releases/latest/download/zellij-${Z_ARCH}.tar.gz"
+        if curl -fsSL "$URL" -o "$TMP/zellij.tar.gz"; then
+            tar -xf "$TMP/zellij.tar.gz" -C "$HOME/.local/bin"
+            chmod +x "$HOME/.local/bin/zellij"
+            log "Zellij instalado en ~/.local/bin/zellij"
+        else
+            log "No se pudo descargar Zellij (continuo)"
+        fi
+        rm -rf "$TMP"
+    fi
+fi
+
+# --- Lazygit: por binario oficial ---
+if ! command -v lazygit >/dev/null 2>&1; then
+    log "Instalando lazygit (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  LG_ARCH="x86_64" ;;
+        aarch64) LG_ARCH="arm64" ;;
+        *)       LG_ARCH="" ;;
+    esac
+    if [ -n "$LG_ARCH" ]; then
+        TMP="$(mktemp -d)"
+        URL="https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_$(uname -s)_${LG_ARCH}.tar.gz"
+        # La URL oficial usa la version en el nombre; usamos la API para resolverla.
+        LG_VER="$(curl -fsSL https://api.github.com/repos/jesseduffield/lazygit/releases/latest | grep -o '"tag_name": *"v[^"]*"' | head -n1 | grep -o '[0-9][0-9.]*')"
+        if [ -n "$LG_VER" ]; then
+            URL="https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LG_VER}_Linux_${LG_ARCH}.tar.gz"
+            if curl -fsSL "$URL" -o "$TMP/lazygit.tar.gz"; then
+                tar -xf "$TMP/lazygit.tar.gz" -C "$HOME/.local/bin" lazygit
+                chmod +x "$HOME/.local/bin/lazygit"
+                log "lazygit instalado en ~/.local/bin/lazygit"
+            else
+                log "No se pudo descargar lazygit (continuo)"
+            fi
+        fi
+        rm -rf "$TMP"
+    fi
+fi
+
+{{- if eq .profile "vps" }}
+
+# ===================== Solo VPS: infra =====================
+
+# --- uv ya instala/gestiona Python; aws-cli v2 por instalador oficial ---
+if ! command -v aws >/dev/null 2>&1; then
+    log "Instalando AWS CLI v2..."
+    ARCH="$(uname -m)"
+    TMP="$(mktemp -d)"
+    if curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "$TMP/awscli.zip"; then
+        (cd "$TMP" && unzip -q awscli.zip && ./aws/install --bin-dir "$HOME/.local/bin" --install-dir "$HOME/.local/aws-cli" --update)
+        log "AWS CLI instalado."
+    else
+        log "No se pudo descargar AWS CLI (continuo)"
+    fi
+    rm -rf "$TMP"
+fi
+
+# --- Terraform: por binario oficial de HashiCorp ---
+if ! command -v terraform >/dev/null 2>&1; then
+    log "Instalando Terraform (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  TF_ARCH="amd64" ;;
+        aarch64) TF_ARCH="arm64" ;;
+        *)       TF_ARCH="" ;;
+    esac
+    if [ -n "$TF_ARCH" ]; then
+        TF_VER="$(curl -fsSL https://api.github.com/repos/hashicorp/terraform/releases/latest | grep -o '"tag_name": *"v[^"]*"' | head -n1 | grep -o '[0-9][0-9.]*')"
+        if [ -n "$TF_VER" ]; then
+            TMP="$(mktemp -d)"
+            URL="https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_linux_${TF_ARCH}.zip"
+            if curl -fsSL "$URL" -o "$TMP/tf.zip"; then
+                (cd "$TMP" && unzip -q tf.zip && mv terraform "$HOME/.local/bin/terraform")
+                chmod +x "$HOME/.local/bin/terraform"
+                log "Terraform $TF_VER instalado."
+            else
+                log "No se pudo descargar Terraform (continuo)"
+            fi
+            rm -rf "$TMP"
+        fi
+    fi
+fi
+
+# --- sops: por binario oficial ---
+if ! command -v sops >/dev/null 2>&1; then
+    log "Instalando sops (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  SOPS_ARCH="amd64" ;;
+        aarch64) SOPS_ARCH="arm64" ;;
+        *)       SOPS_ARCH="" ;;
+    esac
+    if [ -n "$SOPS_ARCH" ]; then
+        SOPS_VER="$(curl -fsSL https://api.github.com/repos/getsops/sops/releases/latest | grep -o '"tag_name": *"v[^"]*"' | head -n1 | grep -o '[0-9][0-9.]*')"
+        if [ -n "$SOPS_VER" ]; then
+            URL="https://github.com/getsops/sops/releases/latest/download/sops-v${SOPS_VER}.linux.${SOPS_ARCH}"
+            if curl -fsSL "$URL" -o "$HOME/.local/bin/sops"; then
+                chmod +x "$HOME/.local/bin/sops"
+                log "sops $SOPS_VER instalado."
+            else
+                log "No se pudo descargar sops (continuo)"
+            fi
+        fi
+    fi
+fi
+{{- end }}
+
+log "Binarios y herramientas listas."

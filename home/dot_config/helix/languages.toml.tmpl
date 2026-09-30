@@ -25,3 +25,27 @@ language-servers = ["yaml-language-server"]
 [[language]]
 name = "markdown"
 language-servers = ["marksman"]
+
+[language-server.rust-analyzer]
+command = "rust-analyzer"
+
+[[language]]
+name = "rust"
+language-servers = ["rust-analyzer"]
+auto-format = true
+{{- if eq .profile "vps" }}
+
+# --- C/C++ (solo VPS) ---
+[language-server.clangd]
+command = "clangd"
+
+[[language]]
+name = "c"
+language-servers = ["clangd"]
+auto-format = true
+
+[[language]]
+name = "cpp"
+language-servers = ["clangd"]
+auto-format = true
+{{- end }}

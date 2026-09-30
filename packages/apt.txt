@@ -1,0 +1,40 @@
+# Paquetes Debian (apt) por perfil.
+# Formato: <paquete> <perfil>
+#   both  -> DC-1 y VPS
+#   dc1   -> solo maquina local (DC-1)
+#   vps   -> solo servidor (VPS)
+# Lineas que empiezan con # se ignoran. bootstrap.sh parsea este archivo.
+#
+# NOTA: solo paquetes que existen en el apt oficial de Debian 13 (trixie).
+# Las herramientas modernas en Rust (helix, zellij, yazi, atuin, eza, zoxide,
+# starship, lazygit) se instalan por cargo/binario en un run_once, porque en
+# apt no estan o van muy atrasadas. Ver home/run_once_05-install-binaries.sh.tmpl
+
+# --- Base (ambos) ---
+git both
+openssh-client both
+openssh-server both
+zsh both
+curl both
+jq both
+ca-certificates both
+
+# --- CLI / TUI que SI estan en apt (ambos) ---
+ripgrep both
+fd-find both
+bat both
+fzf both
+
+# --- Toolchain de compilacion (necesaria para cargo install) ---
+build-essential both
+pkg-config both
+libssl-dev both
+
+# --- Solo VPS: Data Engineering / infra ---
+openjdk-17-jdk vps
+docker.io vps
+age vps
+
+# --- Solo VPS: toolchain C/C++ y LSP ---
+clang vps
+clangd vps

@@ -1,178 +1,159 @@
-# Modular Dev Setup (Nix & Dotfiles)
+# devlab
 
-Declarative development environment configured for Data Engineering (PySpark, AWS, DuckDB), modal editing (Helix), and terminal multiplexing (Zellij) managed via **Nix Flakes & Home Manager on Void Linux**.
+Estación de trabajo de desarrollo reproducible, desplegable con un solo comando.
 
-> **NOTE**: This configuration is designed for **Void Linux** with **Nix + Home Manager**. It is NOT compatible with NixOS.
+Entorno para Data Engineering (Polars, DuckDB, PySpark para tests, AWS), edición
+modal (Helix) y multiplexado de terminal (Zellij), sobre **Debian 13**.
+
+Sin Nix. La gestión es:
+
+- **apt** — paquetes del sistema (Debian).
+- **rustup** — toolchain de Rust (Rust, rust-analyzer).
+- **uv** — Python por proyecto (`uv.lock`, `.venv`), no a nivel de sistema.
+- **chezmoi** — dotfiles y configuración con plantillas por perfil.
+- **Cloudflare R2** — datos persistentes.
 
 ---
 
-## Repository Structure
+## Despliegue con un solo comando
+
+Punto de entrada único para ambos roles (tu máquina cliente o un VPS remoto).
+Desde cualquier dispositivo (Linux, Mac, WSL, Android/Termux):
+
+```bash
+curl -fsSL https://codeberg.org/jdmb/devlab/raw/branch/main/setup.sh | sh
+```
+
+`setup.sh` pregunta qué configurar:
+
+1. **Esta máquina como cliente (dc1)** — instalará el entorno local y enlazará
+   este cliente al VPS generando su propia clave SSH. (En desarrollo.)
+2. **Un VPS remoto (vps)** — pregunta IP y usuario del VPS, se conecta por SSH
+   con la password (la temporal de OVH), clona el repo en el VPS y corre
+   `bootstrap.sh vps`. Se puede hacer desde cualquier PC; no instala claves SSH.
+
+No requiere clonar nada ni tener Python: solo `sh` (y `ssh` para el VPS).
+También puedes pasar el rol como argumento: `sh setup.sh dc1` o `sh setup.sh vps`.
+
+También funciona si ya clonaste el repo: `sh setup.sh`.
+
+**Modelo de responsabilidades:** configurar el VPS (con IP+usuario+password)
+solo deja el servidor con el entorno instalado. Enlazar un cliente al VPS por
+clave SSH es tarea de la configuración del cliente: cada máquina (tablet,
+laptop) genera su clave y la registra en el VPS.
+
+---
+
+## Perfiles
+
+| Perfil | Descripción | Rol |
+|--------|-------------|-----|
+| `dc1`  | Máquina local (Data Center 1) | Edición offline, se conecta al VPS por SSH |
+| `vps`  | Servidor (OVHcloud, Debian) | Trabajo de datos: Polars/DuckDB, tests, Docker |
+
+Reparto de herramientas (resumen):
+
+- **Ambos:** git, openssh, zsh, curl, jq, helix, zellij, lazygit, yazi, ripgrep,
+  fd, fzf, bat, zoxide, eza, atuin, starship, chezmoi, uv, Python (vía uv),
+  rustup + rust-analyzer.
+- **Solo VPS:** JDK (PySpark para tests), Docker, AWS CLI, Terraform, sops, age,
+  toolchain C/C++ + clangd.
+
+Lo que está en el apt oficial de Debian se instala por apt (`packages/apt.txt`);
+las herramientas modernas en Rust y algunos binarios (helix, zellij, lazygit,
+terraform, aws-cli, sops) se instalan por cargo/binario en un `run_once`.
+
+---
+
+## Estructura del repositorio
 
 ```text
-dev-setup/
-├── .github/workflows/   # CI validation
-├── dotfiles/           # Configuration files managed by Home Manager / GNU Stow
-│   ├── ghostty/       # GPU-accelerated terminal configuration
-│   ├── helix/         # Text editor configuration & LSP setups
-│   ├── zellij/        # Terminal multiplexer configuration
-│   ├── lazygit/       # Git TUI configuration
-│   ├── atuin/         # Shell history configuration
-│   └── Makefile       # Fallback installer/stower for non-Nix environments
-├── nix/               # Nix Home Manager modules
-│   ├── common.nix    # Shared system packages, Git, Zsh, Starship & LSPs
-│   ├── server.nix    # Server profile (Data Engineering tools, JVM, UV, Agent cloning)
-│   └── tablet.nix    # Tablet profile (Offline/local lightweight interface)
-├── secrets/           # Age-encrypted secrets (see secrets/README.md)
-├── flake.nix         # Main Flake entrypoint defining profile configurations
-└── README.md         # This guide
+devlab/
+├── setup.sh                  # punto de entrada unico (cliente o VPS)
+├── bootstrap.sh              # server-setup: apt + chezmoi init --apply
+├── docs/
+│   └── vps-ovh.md            # compra manual del VPS y flujo de despliegue
+├── packages/
+│   ├── apt.txt               # paquetes Debian por perfil (both|dc1|vps)
+│   └── cargo.txt             # componentes rustup + herramientas cargo
+├── home/                     # source de chezmoi
+│   ├── .chezmoi.toml.tmpl
+│   ├── .chezmoidata.yaml
+│   ├── dot_gitconfig.tmpl
+│   ├── dot_zshrc.tmpl
+│   ├── dot_config/           # helix, zellij, lazygit, atuin, ghostty
+│   ├── run_once_10-install-toolchains.sh.tmpl  # rustup + uv + cargo
+│   ├── run_once_15-install-binaries.sh.tmpl    # helix, zellij, terraform...
+│   └── run_once_20-clone-agent.sh.tmpl         # clona steering (solo VPS)
+├── .github/workflows/        # CI: shellcheck + render de plantillas
+└── README.md
 ```
 
 ---
 
-## Target Systems
+## bootstrap.sh (dentro del VPS)
 
-| Profile | Description | Architecture |
-|---------|-------------|--------------|
-| `server` | VPS / Data Engineering server | x86_64-linux |
-| `tablet` | Local ARM64 tablet (offline-first) | aarch64-linux |
-
----
-
-## Configuration Storage (Cloudflare Access + GitHub OAuth)
-
-This setup uses **zero manual configuration** by fetching user config from a Cloudflare Access protected endpoint.
-
-### Architecture
-```
-┌─────────────────┐    Cloudflare Access     ┌──────────────────┐
-│  Your Device    │◄─── GitHub OAuth ─────►│  Private Config  │
-│  (no config)   │                        │  (Gist / Bucket)  │
-└─────────────────┘                        └──────────────────┘
-```
-
-### Setup
-
-1. Create a private Gist or use Cloudflare Access tunnel
-2. Protect the URL with GitHub OAuth (require specific GitHub account)
-3. Create `config.json`:
-```json
-{
-  "git": { "userName": "Your Name", "userEmail": "your@email.com" },
-  "home": { "username": "youruser", "homeDirectory": "/home/youruser" }
-}
-```
-4. Update `flake.nix` with your config URL
-
----
-
-## Secrets Management (Agenix)
-
-Age-encrypted secrets for sensitive data (API keys, tokens, credentials). Cifrados en git, descifrados solo en tu máquina.
-
-### Architecture
-```
-┌─────────────────┐
-│  secrets/*.age  │  ← Encrypted with your age public key (safe in git)
-│  (in git)       │
-└─────────────────┘
-        ▼
-┌─────────────────┐
-│  ~/.secrets/    │  ← Decrypted at activation time (never in git)
-│  (home dir)     │
-└─────────────────┘
-```
-
-### 1. Generate age key
+`setup.sh` lo ejecuta por ti, pero también puedes correrlo manual:
 
 ```bash
-nix run github:ryantm/agenix -- --generate
-mkdir -p ~/.config/age
-cp your-age-key.txt ~/.config/age/keys.txt
+./bootstrap.sh dc1   # máquina local
+./bootstrap.sh vps   # servidor
 ```
 
-> NEVER commit `keys.txt`. Backup offline (USB, paper).
+1. Instala los paquetes de `packages/apt.txt` que aplican al perfil.
+2. Crea symlinks `fd`->`fdfind` y `bat`->`batcat` (nombres de Debian).
+3. Instala `chezmoi` en `~/.local/bin` si falta.
+4. Ejecuta `chezmoi init --apply`, que aplica dotfiles y corre los `run_once`
+   (rustup, uv, cargo, binarios y, en VPS, clona el repo de steering).
 
-### 2. Create secrets
+Es **idempotente**: puedes volver a correrlo sin romper nada.
+
+---
+
+## Python por proyecto (uv)
+
+Python **no** se instala a nivel de sistema. Cada proyecto usa `uv`:
 
 ```bash
-nix run github:ryantm/agenix -- -e secrets/aws-credentials.age
-```
-
-Write plaintext content, save (Ctrl+D). The file is stored encrypted.
-
-### 3. Reference in Nix
-
-```nix
-# In server.nix
-age = {
-  publicKey = "age1your-public-key...";
-  secrets = {
-    aws-credentials.file = ./secrets/aws-credentials.age;
-    github-token.file = ./secrets/github-token.age;
-  };
-};
-```
-
-### 4. Activate
-
-```bash
-home-manager switch --flake .#server
-```
-
-Secrets are decrypted to `~/.secrets/` automatically.
-
-### Example structure
-
-```
-secrets/
-├── config.json              # Example template (not a secret)
-├── aws-credentials.age      # AWS keys (encrypted)
-├── github-token.age         # GitHub PAT (encrypted)
-└── api-keys.age             # Other API keys (encrypted)
+cd mi-proyecto
+uv init            # crea pyproject.toml
+uv add polars      # añade dependencias -> uv.lock
+uv run python ...  # ejecuta en el .venv del proyecto
 ```
 
 ---
 
-## Deployment
-
-### Deploying the Profile
-Run the following commands to initialize and apply the Home Manager configuration using Nix Flakes:
+## Secretos (sops + age)
 
 ```bash
-# 1. Initialize Home Manager
-nix run home-manager/master -- init --flake .#server
-
-# 2. Build and activate the profile
-home-manager switch --flake .#server
+sops --encrypt --age <age-public-key> secreto.env > secreto.enc.env  # cifrar
+sops --decrypt secreto.enc.env > ~/.secrets/secreto.env              # descifrar
 ```
-*(Replace `#server` with `#tablet` if deploying to a local/ARM64 client tablet).*
 
-Once activated:
-* Home Manager will symlink all configuration files inside `dotfiles/` to `~/.config/` natively using `xdg.configFile`.
-* Standard LSPs (`pyright`, `ruff`, `taplo`, `yaml-language-server`, `marksman`) will be installed and mapped to Helix automatically.
+`sops` y `age` se instalan en el perfil VPS. La clave privada age vive fuera del
+repo (nunca se commitea).
 
 ---
 
-## CI Validation
+## Datos (Cloudflare R2)
 
-This repository includes a GitHub Actions workflow (`.github/workflows/validate.yml`) that validates:
-- Flake evaluates correctly
-- Both server and tablet configurations build without errors
-
----
-
-## Agent Steering Integration
-Upon activation of the `server` profile:
-* Git will automatically clone the public steering repository `https://github.com/jdmarinb/agent.git` into `~/.agent`.
-* Any agent (like **Antigravity CLI / agy**, Claude Code, Kiro, etc.) running on the server will automatically discover and load the Data Engineering skills defined in `~/.agent/AGENT.md`.
+Los datos persistentes viven en R2 (S3-compatible), accedidos con AWS CLI o
+librerías S3 apuntando al endpoint de R2. El VPS no guarda estado de datos: R2
+es la fuente de verdad, y por eso el VPS es desechable y reproducible.
 
 ---
 
-## Fallback Stow Deployment (Non-Nix Systems)
-If you are on a system where Nix is not available (e.g., standard Ubuntu/macOS) and want to deploy the dotfiles manually:
+## Steering del agente (solo VPS)
 
-```bash
-cd dotfiles
-make install
-```
-*This installs standard binaries manually to `~/.local/bin` and uses `stow` to link the dotfiles to `~/.config`.*
+Al aplicar el perfil `vps`, `chezmoi` clona el repo de steering del agente en
+`~/.agent` y `~/.zshrc` exporta `KIRO_HOME=$HOME/.agent`. El repo se actualiza en
+background al abrir la shell.
+
+---
+
+## CI
+
+`.github/workflows/validate.yml` valida en cada push/PR:
+
+- `shellcheck` sobre `bootstrap.sh`.
+- Render de las plantillas chezmoi para ambos perfiles `dc1` y `vps`.

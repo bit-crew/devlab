@@ -1,0 +1,5 @@
+# Datos estaticos disponibles en todas las plantillas chezmoi.
+# Los datos por-maquina (profile, gitName, gitEmail) se preguntan en .chezmoi.toml.tmpl.
+agent:
+  repo: "https://github.com/jdmarinb/agent.git"
+  home: ".agent"

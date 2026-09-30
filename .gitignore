@@ -1,0 +1,31 @@
+# Secretos y config local (NUNCA subir)
+.env
+*.env
+!*.env.example
+ovh.env
+.secrets/
+*.pem
+*.key
+id_*
+ovh_vps
+ovh_vps.pub
+
+# Script de verificacion local (ruta hardcodeada por maquina)
+.verify.sh
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Terraform state (por si se usa a futuro)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# SO
+.DS_Store
+Thumbs.db

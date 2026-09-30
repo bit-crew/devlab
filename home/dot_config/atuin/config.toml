@@ -2,3 +2,5 @@ inline_height = 15
 style = "compact"
 show_tabs = false
 enter_accept = true
+auto_sync = true
+update_check = false
