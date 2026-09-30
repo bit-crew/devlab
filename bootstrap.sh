@@ -82,14 +82,18 @@ export PATH="$HOME/.local/bin:$PATH"
 export CHEZMOI_PROFILE="$PROFILE"
 
 # chezmoi pregunta profile/gitName/gitEmail via promptStringOnce. En ejecucion
-# no interactiva (SSH sin TTY) hay que pasarlos por --promptString o falla al
-# intentar abrir /dev/tty. gitName/gitEmail se toman de git config si existen.
+# no interactiva (SSH sin TTY) hay que evitar que abra /dev/tty:
+#   --promptString es stringToString: un flag POR CADA par key=value.
+#   --promptDefaults hace que el resto de prompts usen su valor por defecto.
 GIT_NAME="$(git config --global user.name 2>/dev/null || echo devlab)"
 GIT_EMAIL="$(git config --global user.email 2>/dev/null || echo devlab@localhost)"
 
 log "Aplicando dotfiles con chezmoi (source: $REPO_DIR/home)..."
 chezmoi init --apply --source "$REPO_DIR/home" \
-    --promptString "profile=$PROFILE,gitName=$GIT_NAME,gitEmail=$GIT_EMAIL"
+    --promptDefaults \
+    --promptString "profile=$PROFILE" \
+    --promptString "gitName=$GIT_NAME" \
+    --promptString "gitEmail=$GIT_EMAIL"
 
 log "Bootstrap completo para perfil $PROFILE."
 log "Abre una nueva shell zsh para cargar el entorno."
