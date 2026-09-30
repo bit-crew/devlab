@@ -31,7 +31,7 @@ pkg-config both
 libssl-dev both
 
 # --- Solo VPS: Data Engineering / infra ---
-openjdk-17-jdk vps
+openjdk-21-jdk vps
 docker.io vps
 age vps
 
