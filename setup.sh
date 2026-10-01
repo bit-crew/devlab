@@ -87,7 +87,7 @@ setup_vps() {
     "
 
     log "VPS configurado con el entorno devlab."
-    log "El enlace por clave SSH se hace desde el cliente (paso 'dc1')."
+    log "Entra con: ssh $VPS_USER@$VPS_HOST  (y ejecuta 'zsh' para el entorno)"
 }
 
 # ---------------------------------------------------------------------------
