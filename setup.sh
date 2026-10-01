@@ -11,8 +11,8 @@
 #   sh setup.sh
 #
 # Pregunta que configurar:
-#   1) Esta maquina como cliente (perfil dc1)  -> bootstrap local (pendiente)
-#   2) Un VPS remoto (perfil vps)              -> instala el entorno via SSH
+#   1) VPS (perfil vps)                        -> instala el entorno via SSH
+#   2) Cliente / este equipo (perfil dc1)      -> bootstrap local (pendiente)
 #
 # Modelo de responsabilidades:
 #   - Configurar el VPS: se hace desde CUALQUIER PC con IP + usuario + password
@@ -105,12 +105,12 @@ setup_client() {
 ROLE="${1:-}"
 if [ -z "$ROLE" ]; then
     printf '\n¿Que quieres configurar?\n' >/dev/tty
-    printf '  1) Esta maquina como cliente (dc1)\n' >/dev/tty
-    printf '  2) Un VPS remoto (vps)\n' >/dev/tty
-    CHOICE="$(ask 'Opcion' '2')"
+    printf '  1) VPS\n' >/dev/tty
+    printf '  2) Cliente (Este equipo)\n' >/dev/tty
+    CHOICE="$(ask 'Opcion' '1')"
     case "$CHOICE" in
-        1|dc1|cliente|client) ROLE="dc1" ;;
-        2|vps|servidor|server) ROLE="vps" ;;
+        1|vps|servidor|server) ROLE="vps" ;;
+        2|dc1|cliente|client) ROLE="dc1" ;;
         *) err "Opcion invalida: $CHOICE"; exit 1 ;;
     esac
 fi
