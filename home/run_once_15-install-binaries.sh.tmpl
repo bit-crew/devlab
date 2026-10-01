@@ -24,9 +24,8 @@ export CARGO_TARGET_DIR="$BUILD_DIR/cargo-target"
 # --- Herramientas Rust via cargo (ambos perfiles) ---
 # En apt no estan o van muy atrasadas. cargo compila la ultima version.
 # Se instalan solo si el binario no existe (idempotente).
-for tool in eza zoxide starship yazi-fm atuin; do
+for tool in eza zoxide starship atuin; do
     bin="$tool"
-    [ "$tool" = "yazi-fm" ] && bin="yazi"
     if ! command -v "$bin" >/dev/null 2>&1; then
         log "cargo install $tool..."
         cargo install --locked "$tool" || log "Fallo cargo install $tool (continuo)"
@@ -110,6 +109,32 @@ if ! command -v lazygit >/dev/null 2>&1; then
             else
                 log "No se pudo descargar lazygit (continuo)"
             fi
+        fi
+        rm -rf "$TMP"
+    fi
+fi
+
+# --- Yazi: por binario oficial (cargo falla a compilar en estable) ---
+if ! command -v yazi >/dev/null 2>&1; then
+    log "Instalando Yazi (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  Y_ARCH="x86_64-unknown-linux-gnu" ;;
+        aarch64) Y_ARCH="aarch64-unknown-linux-gnu" ;;
+        *)       Y_ARCH="" ;;
+    esac
+    if [ -n "$Y_ARCH" ]; then
+        TMP="$(mktemp -d)"
+        URL="https://github.com/sxyazi/yazi/releases/latest/download/yazi-${Y_ARCH}.zip"
+        if curl -fsSL "$URL" -o "$TMP/yazi.zip"; then
+            (cd "$TMP" && unzip -q yazi.zip && \
+             cp "yazi-${Y_ARCH}/yazi" "$HOME/.local/bin/yazi" && \
+             cp "yazi-${Y_ARCH}/ya" "$HOME/.local/bin/ya" 2>/dev/null || true) \
+                && chmod +x "$HOME/.local/bin/yazi" \
+                && log "Yazi instalado en ~/.local/bin/yazi" \
+                || log "Fallo instalacion de Yazi (continuo)"
+        else
+            log "No se pudo descargar Yazi (continuo)"
         fi
         rm -rf "$TMP"
     fi
