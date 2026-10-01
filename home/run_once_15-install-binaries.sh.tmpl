@@ -114,6 +114,38 @@ if ! command -v lazygit >/dev/null 2>&1; then
     fi
 fi
 
+# --- delta (git-delta): pager de diffs, por binario oficial. Lo usa lazygit. ---
+if ! command -v delta >/dev/null 2>&1; then
+    log "Instalando delta (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  D_ARCH="x86_64-unknown-linux-gnu" ;;
+        aarch64) D_ARCH="aarch64-unknown-linux-gnu" ;;
+        *)       D_ARCH="" ;;
+    esac
+    if [ -n "$D_ARCH" ]; then
+        D_VER="$(curl -fsSL https://api.github.com/repos/dandavison/delta/releases/latest | grep -o '"tag_name": *"[^"]*"' | head -n1 | grep -o '[0-9][0-9.]*')"
+        if [ -n "$D_VER" ]; then
+            TMP="$(mktemp -d)"
+            URL="https://github.com/dandavison/delta/releases/latest/download/delta-${D_VER}-${D_ARCH}.tar.gz"
+            if curl -fsSL "$URL" -o "$TMP/delta.tar.gz"; then
+                tar -xf "$TMP/delta.tar.gz" -C "$TMP"
+                DELTA_BIN="$(find "$TMP" -type f -name delta | head -n1)"
+                if [ -n "$DELTA_BIN" ]; then
+                    cp "$DELTA_BIN" "$HOME/.local/bin/delta"
+                    chmod +x "$HOME/.local/bin/delta"
+                    log "delta $D_VER instalado."
+                else
+                    log "No se encontro el binario delta en el tar (continuo)"
+                fi
+            else
+                log "No se pudo descargar delta (continuo)"
+            fi
+            rm -rf "$TMP"
+        fi
+    fi
+fi
+
 # --- Yazi: por binario oficial (cargo falla a compilar en estable) ---
 if ! command -v yazi >/dev/null 2>&1; then
     log "Instalando Yazi (binario oficial)..."
