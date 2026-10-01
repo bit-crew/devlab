@@ -206,6 +206,76 @@ if ! command -v sops >/dev/null 2>&1; then
         fi
     fi
 fi
+
+# --- Node.js: tarball binario oficial (necesario para wrangler) ---
+if ! command -v node >/dev/null 2>&1; then
+    log "Instalando Node.js (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  NODE_ARCH="x64" ;;
+        aarch64) NODE_ARCH="arm64" ;;
+        *)       NODE_ARCH="" ;;
+    esac
+    if [ -n "$NODE_ARCH" ]; then
+        # Ultima LTS segun el indice oficial de nodejs.org.
+        NODE_VER="$(curl -fsSL https://nodejs.org/dist/index.json | grep -o '"version":"v[^"]*","date":"[^"]*","files":[^]]*],"npm"' | head -n1 | grep -o 'v[0-9][0-9.]*' | head -n1)"
+        [ -z "$NODE_VER" ] && NODE_VER="$(curl -fsSL https://nodejs.org/dist/latest-lts/ | grep -o 'node-v[0-9][0-9.]*' | head -n1 | grep -o 'v[0-9][0-9.]*')"
+        if [ -n "$NODE_VER" ]; then
+            TMP="$(mktemp -d)"
+            URL="https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-linux-${NODE_ARCH}.tar.xz"
+            if curl -fsSL "$URL" -o "$TMP/node.tar.xz"; then
+                mkdir -p "$HOME/.local/node"
+                tar -xf "$TMP/node.tar.xz" -C "$HOME/.local/node" --strip-components=1
+                ln -sf "$HOME/.local/node/bin/node" "$HOME/.local/bin/node"
+                ln -sf "$HOME/.local/node/bin/npm" "$HOME/.local/bin/npm"
+                ln -sf "$HOME/.local/node/bin/npx" "$HOME/.local/bin/npx"
+                log "Node.js $NODE_VER instalado."
+            else
+                log "No se pudo descargar Node.js (continuo)"
+            fi
+            rm -rf "$TMP"
+        fi
+    fi
+fi
+
+# --- wrangler: CLI de Cloudflare (requiere Node; se instala por npm) ---
+if command -v npm >/dev/null 2>&1 && ! command -v wrangler >/dev/null 2>&1; then
+    log "Instalando wrangler (npm)..."
+    npm install -g --prefix "$HOME/.local" wrangler \
+        && log "wrangler instalado." || log "Fallo instalacion de wrangler (continuo)"
+fi
+
+# --- gcloud SDK: por binario oficial ---
+if ! command -v gcloud >/dev/null 2>&1; then
+    log "Instalando Google Cloud SDK (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  GC_ARCH="x86_64" ;;
+        aarch64) GC_ARCH="arm" ;;
+        *)       GC_ARCH="" ;;
+    esac
+    if [ -n "$GC_ARCH" ]; then
+        TMP="$(mktemp -d)"
+        URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-${GC_ARCH}.tar.gz"
+        if curl -fsSL "$URL" -o "$TMP/gcloud.tar.gz"; then
+            tar -xf "$TMP/gcloud.tar.gz" -C "$HOME/.local"
+            "$HOME/.local/google-cloud-sdk/install.sh" --quiet --path-update false >/dev/null 2>&1 || true
+            ln -sf "$HOME/.local/google-cloud-sdk/bin/gcloud" "$HOME/.local/bin/gcloud"
+            ln -sf "$HOME/.local/google-cloud-sdk/bin/gsutil" "$HOME/.local/bin/gsutil"
+            log "gcloud SDK instalado."
+        else
+            log "No se pudo descargar gcloud SDK (continuo)"
+        fi
+        rm -rf "$TMP"
+    fi
+fi
+
+# --- kiro-cli: instalador oficial ---
+if ! command -v kiro >/dev/null 2>&1; then
+    log "Instalando kiro-cli (instalador oficial)..."
+    curl -fsSL https://cli.kiro.dev/install | bash \
+        && log "kiro-cli instalado." || log "Fallo instalacion de kiro-cli (continuo)"
+fi
 {{- end }}
 
 # Limpia artefactos de compilacion para no dejar disco ocupado.

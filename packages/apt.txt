@@ -8,7 +8,7 @@
 # NOTA: solo paquetes que existen en el apt oficial de Debian 13 (trixie).
 # Las herramientas modernas en Rust (helix, zellij, yazi, atuin, eza, zoxide,
 # starship, lazygit) se instalan por cargo/binario en un run_once, porque en
-# apt no estan o van muy atrasadas. Ver home/run_once_05-install-binaries.sh.tmpl
+# apt no estan o van muy atrasadas. Ver home/run_once_15-install-binaries.sh.tmpl
 
 # --- Base (ambos) ---
 git both
