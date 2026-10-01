@@ -12,6 +12,15 @@ log() { printf '\033[1;34m[run_once:binaries]\033[0m %s\n' "$1"; }
 mkdir -p "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
+# IMPORTANTE: en VPS pequenos /tmp suele ser tmpfs en RAM (1-2 GB) y se llena al
+# compilar con cargo o descargar binarios -> errores "curl (23)" y fallos de
+# compilacion. Redirigimos temporales y build de cargo a DISCO (hay espacio de
+# sobra en /), no a RAM.
+BUILD_DIR="$HOME/.cache/devlab-build"
+mkdir -p "$BUILD_DIR"
+export TMPDIR="$BUILD_DIR"
+export CARGO_TARGET_DIR="$BUILD_DIR/cargo-target"
+
 # --- Herramientas Rust via cargo (ambos perfiles) ---
 # En apt no estan o van muy atrasadas. cargo compila la ultima version.
 # Se instalan solo si el binario no existe (idempotente).
@@ -173,5 +182,8 @@ if ! command -v sops >/dev/null 2>&1; then
     fi
 fi
 {{- end }}
+
+# Limpia artefactos de compilacion para no dejar disco ocupado.
+rm -rf "$BUILD_DIR" 2>/dev/null || true
 
 log "Binarios y herramientas listas."
