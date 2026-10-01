@@ -29,7 +29,7 @@ for tool in eza zoxide starship yazi-fm atuin; do
     [ "$tool" = "yazi-fm" ] && bin="yazi"
     if ! command -v "$bin" >/dev/null 2>&1; then
         log "cargo install $tool..."
-        cargo install "$tool" || log "Fallo cargo install $tool (continuo)"
+        cargo install --locked "$tool" || log "Fallo cargo install $tool (continuo)"
     fi
 done
 
@@ -125,8 +125,8 @@ if ! command -v aws >/dev/null 2>&1; then
     ARCH="$(uname -m)"
     TMP="$(mktemp -d)"
     if curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "$TMP/awscli.zip"; then
-        (cd "$TMP" && unzip -q awscli.zip && ./aws/install --bin-dir "$HOME/.local/bin" --install-dir "$HOME/.local/aws-cli" --update)
-        log "AWS CLI instalado."
+        (cd "$TMP" && unzip -q awscli.zip && ./aws/install --bin-dir "$HOME/.local/bin" --install-dir "$HOME/.local/aws-cli" --update) \
+            && log "AWS CLI instalado." || log "Fallo instalacion de AWS CLI (continuo)"
     else
         log "No se pudo descargar AWS CLI (continuo)"
     fi

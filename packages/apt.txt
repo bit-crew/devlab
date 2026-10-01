@@ -29,6 +29,7 @@ fzf both
 build-essential both
 pkg-config both
 libssl-dev both
+unzip both
 
 # --- Solo VPS: Data Engineering / infra ---
 openjdk-21-jdk vps
