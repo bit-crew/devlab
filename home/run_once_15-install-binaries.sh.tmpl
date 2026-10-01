@@ -245,7 +245,9 @@ if command -v npm >/dev/null 2>&1 && ! command -v wrangler >/dev/null 2>&1; then
         && log "wrangler instalado." || log "Fallo instalacion de wrangler (continuo)"
 fi
 
-# --- gcloud SDK: por binario oficial ---
+# --- gcloud SDK: por archivo versionado oficial ---
+# Nota: dl.google.com puede dar 404 desde algunas redes; usamos el mirror
+# storage.googleapis.com/cloud-sdk-release que es estable.
 if ! command -v gcloud >/dev/null 2>&1; then
     log "Instalando Google Cloud SDK (binario oficial)..."
     ARCH="$(uname -m)"
@@ -255,18 +257,25 @@ if ! command -v gcloud >/dev/null 2>&1; then
         *)       GC_ARCH="" ;;
     esac
     if [ -n "$GC_ARCH" ]; then
-        TMP="$(mktemp -d)"
-        URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-${GC_ARCH}.tar.gz"
-        if curl -fsSL "$URL" -o "$TMP/gcloud.tar.gz"; then
-            tar -xf "$TMP/gcloud.tar.gz" -C "$HOME/.local"
-            "$HOME/.local/google-cloud-sdk/install.sh" --quiet --path-update false >/dev/null 2>&1 || true
-            ln -sf "$HOME/.local/google-cloud-sdk/bin/gcloud" "$HOME/.local/bin/gcloud"
-            ln -sf "$HOME/.local/google-cloud-sdk/bin/gsutil" "$HOME/.local/bin/gsutil"
-            log "gcloud SDK instalado."
+        # Resuelve el ultimo archivo disponible listando el bucket oficial
+        # (fiable: devuelve nombres que existen de verdad).
+        GC_FILE="$(curl -fsSL "https://storage.googleapis.com/storage/v1/b/cloud-sdk-release/o?prefix=google-cloud-cli-&maxResults=4000" 2>/dev/null | grep -o "google-cloud-cli-[0-9][0-9.]*-linux-${GC_ARCH}.tar.gz" | sort -V | tail -n1)"
+        if [ -n "$GC_FILE" ]; then
+            TMP="$(mktemp -d)"
+            URL="https://storage.googleapis.com/cloud-sdk-release/${GC_FILE}"
+            if curl -fsSL "$URL" -o "$TMP/gcloud.tar.gz"; then
+                tar -xf "$TMP/gcloud.tar.gz" -C "$HOME/.local"
+                "$HOME/.local/google-cloud-sdk/install.sh" --quiet --path-update false >/dev/null 2>&1 || true
+                ln -sf "$HOME/.local/google-cloud-sdk/bin/gcloud" "$HOME/.local/bin/gcloud"
+                ln -sf "$HOME/.local/google-cloud-sdk/bin/gsutil" "$HOME/.local/bin/gsutil"
+                log "gcloud SDK instalado ($GC_FILE)."
+            else
+                log "No se pudo descargar gcloud SDK (continuo)"
+            fi
+            rm -rf "$TMP"
         else
-            log "No se pudo descargar gcloud SDK (continuo)"
+            log "No se pudo resolver la version de gcloud SDK (continuo)"
         fi
-        rm -rf "$TMP"
     fi
 fi
 
