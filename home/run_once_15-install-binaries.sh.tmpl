@@ -235,6 +235,15 @@ if command -v uv >/dev/null 2>&1 && ! command -v ruff >/dev/null 2>&1; then
         && log "ruff instalado." || log "Fallo instalacion de ruff (continuo)"
 fi
 
+# --- pudb: debugger TUI de Python para debug local, global aislado via uv ---
+# Debug remoto (contenedores/procesos) se hace con debugpy POR PROYECTO
+# (uv add --dev debugpy); Helix ya esta configurado para usarlo cuando exista.
+if command -v uv >/dev/null 2>&1 && ! command -v pudb >/dev/null 2>&1; then
+    log "Instalando pudb (uv tool, global aislado)..."
+    uv tool install pudb \
+        && log "pudb instalado." || log "Fallo instalacion de pudb (continuo)"
+fi
+
 # --- Yazi: por binario oficial (cargo falla a compilar en estable) ---
 if ! command -v yazi >/dev/null 2>&1; then
     log "Instalando Yazi (binario oficial)..."
