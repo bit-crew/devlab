@@ -395,6 +395,9 @@ rm -rf "$BUILD_DIR" 2>/dev/null || true
 # de Python/Rust/TOML/YAML/etc. se compilan bien igualmente.
 if command -v hx >/dev/null 2>&1; then
     log "Descargando y compilando grammars de Helix (puede tardar)..."
+    # Apunta al runtime del binario (donde estan las highlight queries) para que
+    # los grammars compilados queden junto a ellas.
+    export HELIX_RUNTIME="$HOME/.local/share/helix-runtime"
     hx --grammar fetch >/dev/null 2>&1 || true
     hx --grammar build >/dev/null 2>&1 || true
     log "Grammars de Helix procesados."

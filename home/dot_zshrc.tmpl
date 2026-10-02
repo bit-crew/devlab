@@ -28,6 +28,9 @@ alias ..="cd .."
 # Editor por defecto
 export EDITOR="hx"
 export VISUAL="hx"
+# Runtime de Helix (queries de resaltado + grammars). El binario de Helix se
+# instala con su runtime aqui; sin esta variable no encuentra las highlight queries.
+export HELIX_RUNTIME="$HOME/.local/share/helix-runtime"
 
 # Integraciones (una linea = un eval, sin loops)
 command -v starship >/dev/null && eval "$(starship init zsh)"
