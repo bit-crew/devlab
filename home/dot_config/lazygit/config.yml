@@ -7,7 +7,6 @@ gui:
       - white
     selectedLineBgColor:
       - reverse
-  showIcons: true
   nerdFontsVersion: "3"
   commitLength:
     show: true
@@ -19,5 +18,7 @@ git:
 update:
   method: never
   days: 14
+confirmOnQuit: false
 os:
   editPreset: "helix"
+  disableStartupPopups: true
