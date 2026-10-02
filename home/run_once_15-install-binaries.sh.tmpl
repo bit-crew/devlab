@@ -32,6 +32,14 @@ for tool in eza zoxide starship atuin; do
     fi
 done
 
+# --- taplo: LSP de TOML (pyproject.toml, Cargo.toml, etc.). Via cargo. ---
+# El paquete es taplo-cli y necesita la feature 'lsp' para servir como LSP.
+if ! command -v taplo >/dev/null 2>&1; then
+    log "cargo install taplo-cli (con LSP)..."
+    cargo install --locked --features lsp taplo-cli \
+        || log "Fallo cargo install taplo-cli (continuo)"
+fi
+
 # --- Helix: por binario oficial (compilar por cargo requiere fetch de grammars) ---
 if ! command -v hx >/dev/null 2>&1; then
     log "Instalando Helix (binario oficial)..."
@@ -146,6 +154,26 @@ if ! command -v delta >/dev/null 2>&1; then
     fi
 fi
 
+# --- marksman: LSP de Markdown. Binario oficial (descarga directa). ---
+if ! command -v marksman >/dev/null 2>&1; then
+    log "Instalando marksman (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  MK_ARCH="x64" ;;
+        aarch64) MK_ARCH="arm64" ;;
+        *)       MK_ARCH="" ;;
+    esac
+    if [ -n "$MK_ARCH" ]; then
+        URL="https://github.com/artempyanykh/marksman/releases/latest/download/marksman-linux-${MK_ARCH}"
+        if curl -fsSL "$URL" -o "$HOME/.local/bin/marksman"; then
+            chmod +x "$HOME/.local/bin/marksman"
+            log "marksman instalado."
+        else
+            log "No se pudo descargar marksman (continuo)"
+        fi
+    fi
+fi
+
 # --- codelldb: adaptador DAP para debug de Rust/C/C++. Global. ---
 # Se distribuye como .vsix (un zip). Dentro, extension/adapter/codelldb es el
 # binario, que necesita sus librerias al lado -> se extrae el dir completo.
@@ -226,6 +254,13 @@ if command -v npm >/dev/null 2>&1 && ! command -v basedpyright-langserver >/dev/
     log "Instalando basedpyright (npm global)..."
     npm install -g --prefix "$HOME/.local" basedpyright \
         && log "basedpyright instalado." || log "Fallo instalacion de basedpyright (continuo)"
+fi
+
+# --- yaml-language-server: LSP de YAML (CI, docker-compose). npm global. ---
+if command -v npm >/dev/null 2>&1 && ! command -v yaml-language-server >/dev/null 2>&1; then
+    log "Instalando yaml-language-server (npm global)..."
+    npm install -g --prefix "$HOME/.local" yaml-language-server \
+        && log "yaml-language-server instalado." || log "Fallo instalacion de yaml-language-server (continuo)"
 fi
 
 # --- ruff: linter/formatter de Python para el editor, global aislado via uv ---

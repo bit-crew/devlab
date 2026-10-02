@@ -29,3 +29,8 @@ right = ["diagnostics", "selections", "position", "file-encoding", "file-line-en
 mode.normal = "NORMAL"
 mode.insert = "INSERT"
 mode.select = "SELECT"
+
+# Recargar buffers desde disco (util cuando otro editor como kiro modifica
+# archivos abiertos). Ctrl-r en normal mode recarga todos los buffers.
+[keys.normal]
+C-r = ":reload-all"
