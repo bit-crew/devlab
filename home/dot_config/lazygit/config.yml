@@ -18,3 +18,5 @@ git:
 update:
   method: never
   days: 14
+os:
+  editPreset: "helix"
