@@ -164,6 +164,49 @@ if [ ! -f "$FONT_DIR/JetBrainsMonoNerdFont-Regular.ttf" ]; then
     rm -rf "$TMP"
 fi
 
+# --- Node.js: tarball binario oficial (lo necesitan basedpyright y wrangler) ---
+if ! command -v node >/dev/null 2>&1; then
+    log "Instalando Node.js (binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  NODE_ARCH="x64" ;;
+        aarch64) NODE_ARCH="arm64" ;;
+        *)       NODE_ARCH="" ;;
+    esac
+    if [ -n "$NODE_ARCH" ]; then
+        NODE_VER="$(curl -fsSL https://nodejs.org/dist/index.json | grep -o '"version":"v[^"]*"' | head -n1 | grep -o 'v[0-9][0-9.]*')"
+        if [ -n "$NODE_VER" ]; then
+            TMP="$(mktemp -d)"
+            URL="https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-linux-${NODE_ARCH}.tar.xz"
+            if curl -fsSL "$URL" -o "$TMP/node.tar.xz"; then
+                mkdir -p "$HOME/.local/node"
+                tar -xf "$TMP/node.tar.xz" -C "$HOME/.local/node" --strip-components=1
+                ln -sf "$HOME/.local/node/bin/node" "$HOME/.local/bin/node"
+                ln -sf "$HOME/.local/node/bin/npm" "$HOME/.local/bin/npm"
+                ln -sf "$HOME/.local/node/bin/npx" "$HOME/.local/bin/npx"
+                log "Node.js $NODE_VER instalado."
+            else
+                log "No se pudo descargar Node.js (continuo)"
+            fi
+            rm -rf "$TMP"
+        fi
+    fi
+fi
+
+# --- basedpyright: LSP de Python (autocompletado/tipos), global via npm ---
+if command -v npm >/dev/null 2>&1 && ! command -v basedpyright-langserver >/dev/null 2>&1; then
+    log "Instalando basedpyright (npm global)..."
+    npm install -g --prefix "$HOME/.local" basedpyright \
+        && log "basedpyright instalado." || log "Fallo instalacion de basedpyright (continuo)"
+fi
+
+# --- ruff: linter/formatter de Python para el editor, global aislado via uv ---
+if command -v uv >/dev/null 2>&1 && ! command -v ruff >/dev/null 2>&1; then
+    log "Instalando ruff (uv tool, global aislado)..."
+    uv tool install ruff \
+        && log "ruff instalado." || log "Fallo instalacion de ruff (continuo)"
+fi
+
 # --- Yazi: por binario oficial (cargo falla a compilar en estable) ---
 if ! command -v yazi >/dev/null 2>&1; then
     log "Instalando Yazi (binario oficial)..."
@@ -253,37 +296,6 @@ if ! command -v sops >/dev/null 2>&1; then
             else
                 log "No se pudo descargar sops (continuo)"
             fi
-        fi
-    fi
-fi
-
-# --- Node.js: tarball binario oficial (necesario para wrangler) ---
-if ! command -v node >/dev/null 2>&1; then
-    log "Instalando Node.js (binario oficial)..."
-    ARCH="$(uname -m)"
-    case "$ARCH" in
-        x86_64)  NODE_ARCH="x64" ;;
-        aarch64) NODE_ARCH="arm64" ;;
-        *)       NODE_ARCH="" ;;
-    esac
-    if [ -n "$NODE_ARCH" ]; then
-        # Ultima LTS segun el indice oficial de nodejs.org.
-        NODE_VER="$(curl -fsSL https://nodejs.org/dist/index.json | grep -o '"version":"v[^"]*","date":"[^"]*","files":[^]]*],"npm"' | head -n1 | grep -o 'v[0-9][0-9.]*' | head -n1)"
-        [ -z "$NODE_VER" ] && NODE_VER="$(curl -fsSL https://nodejs.org/dist/latest-lts/ | grep -o 'node-v[0-9][0-9.]*' | head -n1 | grep -o 'v[0-9][0-9.]*')"
-        if [ -n "$NODE_VER" ]; then
-            TMP="$(mktemp -d)"
-            URL="https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-linux-${NODE_ARCH}.tar.xz"
-            if curl -fsSL "$URL" -o "$TMP/node.tar.xz"; then
-                mkdir -p "$HOME/.local/node"
-                tar -xf "$TMP/node.tar.xz" -C "$HOME/.local/node" --strip-components=1
-                ln -sf "$HOME/.local/node/bin/node" "$HOME/.local/bin/node"
-                ln -sf "$HOME/.local/node/bin/npm" "$HOME/.local/bin/npm"
-                ln -sf "$HOME/.local/node/bin/npx" "$HOME/.local/bin/npx"
-                log "Node.js $NODE_VER instalado."
-            else
-                log "No se pudo descargar Node.js (continuo)"
-            fi
-            rm -rf "$TMP"
         fi
     fi
 fi

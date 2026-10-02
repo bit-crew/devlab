@@ -1,16 +1,17 @@
-[language-server.pyright]
-command = "pyright-langserver"
+[language-server.basedpyright]
+command = "basedpyright-langserver"
 args = ["--stdio"]
 
 [language-server.ruff]
-command = "ruff-lsp"
+command = "ruff"
+args = ["server"]
 
 [[language]]
 name = "python"
 scope = "source.python"
 injection-regex = "python"
 file-types = ["py"]
-language-servers = ["pyright", "ruff"]
+language-servers = ["basedpyright", "ruff"]
 formatter = { command = "ruff", args = ["format", "-"] }
 auto-format = true
 
