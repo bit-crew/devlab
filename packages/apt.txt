@@ -18,6 +18,7 @@ zsh both
 curl both
 jq both
 ca-certificates both
+fontconfig both
 
 # --- CLI / TUI que SI estan en apt (ambos) ---
 ripgrep both

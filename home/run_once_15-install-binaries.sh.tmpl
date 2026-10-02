@@ -146,6 +146,24 @@ if ! command -v delta >/dev/null 2>&1; then
     fi
 fi
 
+# --- JetBrains Mono Nerd Font: para iconos en lazygit/eza/starship ---
+# Se instala en ~/.local/share/fonts (sirve tambien para la consola KVM de OVH).
+FONT_DIR="$HOME/.local/share/fonts"
+if [ ! -f "$FONT_DIR/JetBrainsMonoNerdFont-Regular.ttf" ]; then
+    log "Instalando JetBrains Mono Nerd Font..."
+    mkdir -p "$FONT_DIR"
+    TMP="$(mktemp -d)"
+    URL="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"
+    if curl -fsSL "$URL" -o "$TMP/font.zip"; then
+        unzip -qo "$TMP/font.zip" -d "$FONT_DIR" '*.ttf' \
+            && command -v fc-cache >/dev/null 2>&1 && fc-cache -f "$FONT_DIR" >/dev/null 2>&1
+        log "JetBrains Mono Nerd Font instalada."
+    else
+        log "No se pudo descargar la Nerd Font (continuo)"
+    fi
+    rm -rf "$TMP"
+fi
+
 # --- Yazi: por binario oficial (cargo falla a compilar en estable) ---
 if ! command -v yazi >/dev/null 2>&1; then
     log "Instalando Yazi (binario oficial)..."
