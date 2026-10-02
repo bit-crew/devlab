@@ -146,6 +146,34 @@ if ! command -v delta >/dev/null 2>&1; then
     fi
 fi
 
+# --- codelldb: adaptador DAP para debug de Rust/C/C++. Global. ---
+# Se distribuye como .vsix (un zip). Dentro, extension/adapter/codelldb es el
+# binario, que necesita sus librerias al lado -> se extrae el dir completo.
+if [ ! -x "$HOME/.local/codelldb/adapter/codelldb" ]; then
+    log "Instalando codelldb (adaptador DAP, binario oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  CL_ARCH="x64" ;;
+        aarch64) CL_ARCH="arm64" ;;
+        *)       CL_ARCH="" ;;
+    esac
+    if [ -n "$CL_ARCH" ]; then
+        TMP="$(mktemp -d)"
+        URL="https://github.com/vadimcn/codelldb/releases/latest/download/codelldb-linux-${CL_ARCH}.vsix"
+        if curl -fsSL "$URL" -o "$TMP/codelldb.vsix"; then
+            unzip -qo "$TMP/codelldb.vsix" -d "$TMP/x" \
+                && rm -rf "$HOME/.local/codelldb" \
+                && mv "$TMP/x/extension" "$HOME/.local/codelldb" \
+                && chmod +x "$HOME/.local/codelldb/adapter/codelldb" \
+                && ln -sf "$HOME/.local/codelldb/adapter/codelldb" "$HOME/.local/bin/codelldb" \
+                && log "codelldb instalado." || log "Fallo instalacion de codelldb (continuo)"
+        else
+            log "No se pudo descargar codelldb (continuo)"
+        fi
+        rm -rf "$TMP"
+    fi
+fi
+
 # --- JetBrains Mono Nerd Font: para iconos en lazygit/eza/starship ---
 # Se instala en ~/.local/share/fonts (sirve tambien para la consola KVM de OVH).
 FONT_DIR="$HOME/.local/share/fonts"

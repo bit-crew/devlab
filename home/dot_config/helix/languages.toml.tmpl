@@ -34,6 +34,22 @@ command = "rust-analyzer"
 name = "rust"
 language-servers = ["rust-analyzer"]
 auto-format = true
+
+# Debug de Rust con codelldb (adaptador DAP). Pon breakpoints en Helix y lanza
+# con el comando :debug-start. codelldb debe estar en PATH (lo instala el
+# run_once en ~/.local/bin/codelldb).
+[language.debugger]
+name = "codelldb"
+transport = "stdio"
+command = "codelldb"
+args = ["--port", "{}"]
+port-arg = "--port {}"
+
+[[language.debugger.templates]]
+name = "binary"
+request = "launch"
+completion = [{ name = "binary", completion = "filename" }]
+args = { program = "{0}" }
 {{- if eq .profile "vps" }}
 
 # --- C/C++ (solo VPS) ---
