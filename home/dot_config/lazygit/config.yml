@@ -8,6 +8,7 @@ gui:
     selectedLineBgColor:
       - reverse
   showIcons: true
+  nerdFontsVersion: "3"
   commitLength:
     show: true
 git:
