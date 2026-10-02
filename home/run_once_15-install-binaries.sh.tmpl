@@ -389,4 +389,12 @@ fi
 # Limpia artefactos de compilacion para no dejar disco ocupado.
 rm -rf "$BUILD_DIR" 2>/dev/null || true
 
+# Grammars de tree-sitter de Helix (resaltado de sintaxis). Sin esto el codigo
+# se ve sin colores. Requiere el compilador C (build-essential, ya instalado).
+if command -v hx >/dev/null 2>&1; then
+    log "Descargando y compilando grammars de Helix..."
+    hx --grammar fetch >/dev/null 2>&1 && hx --grammar build >/dev/null 2>&1 \
+        && log "Grammars de Helix listos." || log "Fallo build de grammars (continuo)"
+fi
+
 log "Binarios y herramientas listas."
