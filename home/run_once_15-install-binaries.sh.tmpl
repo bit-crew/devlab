@@ -181,9 +181,6 @@ if ! command -v node >/dev/null 2>&1; then
             if curl -fsSL "$URL" -o "$TMP/node.tar.xz"; then
                 mkdir -p "$HOME/.local/node"
                 tar -xf "$TMP/node.tar.xz" -C "$HOME/.local/node" --strip-components=1
-                ln -sf "$HOME/.local/node/bin/node" "$HOME/.local/bin/node"
-                ln -sf "$HOME/.local/node/bin/npm" "$HOME/.local/bin/npm"
-                ln -sf "$HOME/.local/node/bin/npx" "$HOME/.local/bin/npx"
                 log "Node.js $NODE_VER instalado."
             else
                 log "No se pudo descargar Node.js (continuo)"
@@ -192,6 +189,9 @@ if ! command -v node >/dev/null 2>&1; then
         fi
     fi
 fi
+# node/bin al PATH del script (npm/npx son symlinks internos; no se deben
+# re-symlinkear, hay que usar su propio directorio bin).
+export PATH="$HOME/.local/node/bin:$PATH"
 
 # --- basedpyright: LSP de Python (autocompletado/tipos), global via npm ---
 if command -v npm >/dev/null 2>&1 && ! command -v basedpyright-langserver >/dev/null 2>&1; then
