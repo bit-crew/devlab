@@ -1,9 +1,0 @@
-# Ghostty Configuration
-font-family = "JetBrains Mono"
-font-size = 12
-theme = "catppuccin-mocha"
-macos-option-as-alt = true
-window-padding-x = 4
-window-padding-y = 4
-window-decoration = false
-gtk-single-instance = true

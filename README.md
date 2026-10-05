@@ -81,7 +81,7 @@ devlab/
 │   ├── .chezmoidata.yaml
 │   ├── dot_gitconfig.tmpl
 │   ├── dot_zshrc.tmpl
-│   ├── dot_config/           # helix, zellij, lazygit, atuin, ghostty
+│   ├── dot_config/           # helix, zellij, lazygit, atuin
 │   ├── run_once_10-install-toolchains.sh.tmpl  # rustup + uv + cargo
 │   ├── run_once_15-install-binaries.sh.tmpl    # helix, zellij, terraform...
 │   └── run_once_20-clone-agent.sh.tmpl         # clona steering (solo VPS)
