@@ -1,21 +1,18 @@
 #!/bin/sh
-# bootstrap.sh - server-setup para Debian 13 (DC-1 y VPS).
+# bootstrap.sh - server-setup multiplataforma (Debian, Termux/Android, macOS).
 # Idempotente: se puede correr multiples veces sin romper nada.
 #
 # Uso:
-#   ./bootstrap.sh dc1     # maquina local
+#   ./bootstrap.sh dc1     # maquina cliente (local)
 #   ./bootstrap.sh vps     # servidor
 #
-# Flujo:
-#   1. Instala paquetes de sistema (apt) segun perfil desde packages/apt.txt
-#   2. Instala chezmoi si falta
-#   3. chezmoi init --apply  -> aplica dotfiles y corre scripts run_once
-#      (rustup, uv, cargo, binarios y clonado del agent viven en los run_once)
+# Detecta el gestor de paquetes (apt | pkg | brew) y usa la columna adecuada
+# de packages/system.txt. Luego instala chezmoi y aplica dotfiles + run_once.
 
 set -eu
 
 REPO_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-PKG_FILE="$REPO_DIR/packages/apt.txt"
+PKG_FILE="$REPO_DIR/packages/system.txt"
 
 log() { printf '\033[1;32m[bootstrap]\033[0m %s\n' "$1"; }
 err() { printf '\033[1;31m[bootstrap]\033[0m %s\n' "$1" >&2; }
@@ -28,38 +25,76 @@ if [ "$PROFILE" != "dc1" ] && [ "$PROFILE" != "vps" ]; then
 fi
 log "Perfil seleccionado: $PROFILE"
 
-# --- 1. Paquetes de sistema (apt) ---
-if ! command -v apt-get >/dev/null 2>&1; then
-    err "apt-get no encontrado. Este script requiere Debian/Ubuntu."
+# --- Detectar gestor de paquetes ---
+# Termux define $PREFIX con com.termux y trae 'pkg'. Debian trae 'apt-get'.
+# macOS trae 'brew'. La columna en system.txt se elige segun esto.
+detect_pkgmgr() {
+    if [ -n "${PREFIX:-}" ] && command -v pkg >/dev/null 2>&1 && \
+       printf '%s' "$PREFIX" | grep -q com.termux; then
+        echo "pkg"
+    elif command -v apt-get >/dev/null 2>&1; then
+        echo "apt"
+    elif command -v brew >/dev/null 2>&1; then
+        echo "brew"
+    else
+        echo ""
+    fi
+}
+
+PKGMGR="$(detect_pkgmgr)"
+if [ -z "$PKGMGR" ]; then
+    err "No se detecto apt, pkg (Termux) ni brew. Gestor no soportado."
     exit 1
 fi
+log "Gestor de paquetes detectado: $PKGMGR"
 
 if [ ! -f "$PKG_FILE" ]; then
     err "No existe $PKG_FILE"
     exit 1
 fi
 
-# Selecciona paquetes cuyo perfil es 'both' o coincide con el perfil actual.
-# Ignora comentarios y lineas vacias.
-PACKAGES="$(awk -v p="$PROFILE" '
+# --- Seleccionar la columna del gestor ---
+# Columnas de system.txt: 1=id 2=perfil 3=apt 4=pkg 5=brew
+case "$PKGMGR" in
+    apt)  COL=3 ;;
+    pkg)  COL=4 ;;
+    brew) COL=5 ;;
+esac
+
+# Paquetes del perfil (both o el actual), tomando la columna del gestor.
+# Se ignoran comentarios, vacias y los marcados '-' (no aplica en ese gestor).
+PACKAGES="$(awk -v p="$PROFILE" -v c="$COL" '
     /^[[:space:]]*#/ { next }
     /^[[:space:]]*$/ { next }
-    ($2 == "both" || $2 == p) { print $1 }
+    ($2 == "both" || $2 == p) && $c != "-" { print $c }
 ' "$PKG_FILE")"
 
+# --- Instalar paquetes segun gestor ---
 if [ -n "$PACKAGES" ]; then
-    log "Actualizando indice de paquetes apt..."
-    sudo apt-get update -y
-    log "Instalando paquetes: $(echo "$PACKAGES" | tr '\n' ' ')"
-    # DEBIAN_FRONTEND=noninteractive evita prompts durante la instalacion.
-    # shellcheck disable=SC2086
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $PACKAGES
+    PKGLIST="$(echo "$PACKAGES" | tr '\n' ' ')"
+    log "Instalando ($PKGMGR): $PKGLIST"
+    case "$PKGMGR" in
+        apt)
+            sudo apt-get update -y
+            # shellcheck disable=SC2086
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $PKGLIST
+            ;;
+        pkg)
+            pkg update -y
+            # shellcheck disable=SC2086
+            pkg install -y $PKGLIST
+            ;;
+        brew)
+            # shellcheck disable=SC2086
+            brew install $PKGLIST
+            ;;
+    esac
 else
-    log "No hay paquetes para el perfil $PROFILE"
+    log "No hay paquetes para el perfil $PROFILE en $PKGMGR"
 fi
 
-# En Debian, fd-find instala el binario 'fdfind' y bat instala 'batcat'.
-# Creamos symlinks en ~/.local/bin para usarlos como 'fd' y 'bat'.
+# En Debian, fd-find instala 'fdfind' y bat instala 'batcat'; symlinks a fd/bat.
+# En Termux/brew los binarios ya se llaman fd/bat, asi que esto solo aplica a apt.
 mkdir -p "$HOME/.local/bin"
 if command -v fdfind >/dev/null 2>&1 && [ ! -e "$HOME/.local/bin/fd" ]; then
     ln -s "$(command -v fdfind)" "$HOME/.local/bin/fd"
@@ -70,21 +105,15 @@ if command -v batcat >/dev/null 2>&1 && [ ! -e "$HOME/.local/bin/bat" ]; then
     log "Symlink bat -> batcat creado en ~/.local/bin"
 fi
 
-# --- 2. chezmoi ---
+# --- chezmoi ---
 if ! command -v chezmoi >/dev/null 2>&1; then
     log "Instalando chezmoi en ~/.local/bin..."
     sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
 fi
 export PATH="$HOME/.local/bin:$PATH"
 
-# --- 3. chezmoi init --apply ---
-# Exporta el perfil para que las plantillas lo consuman sin preguntar de nuevo.
+# --- chezmoi init --apply ---
 export CHEZMOI_PROFILE="$PROFILE"
-
-# chezmoi pregunta profile/gitName/gitEmail via promptStringOnce. En ejecucion
-# no interactiva (SSH sin TTY) hay que evitar que abra /dev/tty:
-#   --promptString es stringToString: un flag POR CADA par key=value.
-#   --promptDefaults hace que el resto de prompts usen su valor por defecto.
 GIT_NAME="$(git config --global user.name 2>/dev/null || echo devlab)"
 GIT_EMAIL="$(git config --global user.email 2>/dev/null || echo devlab@localhost)"
 
@@ -95,5 +124,5 @@ chezmoi init --apply --source "$REPO_DIR/home" \
     --promptString "gitName=$GIT_NAME" \
     --promptString "gitEmail=$GIT_EMAIL"
 
-log "Bootstrap completo para perfil $PROFILE."
+log "Bootstrap completo para perfil $PROFILE ($PKGMGR)."
 log "Abre una nueva shell zsh para cargar el entorno."
