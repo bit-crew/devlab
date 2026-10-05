@@ -413,11 +413,28 @@ if ! command -v gcloud >/dev/null 2>&1; then
     fi
 fi
 
-# --- kiro-cli: instalador oficial ---
-if ! command -v kiro >/dev/null 2>&1; then
-    log "Instalando kiro-cli (instalador oficial)..."
-    curl -fsSL https://cli.kiro.dev/install | bash \
-        && log "kiro-cli instalado." || log "Fallo instalacion de kiro-cli (continuo)"
+# --- kiro-cli: metodo oficial (zip + install.sh en ~/.local/bin) ---
+# El one-liner curl|bash dejaba el launcher 'kiro-cli' roto; el zip oficial
+# instala bien. Zip estandar requiere glibc 2.34+ (Debian 13 trae 2.41).
+if ! command -v kiro-cli >/dev/null 2>&1 || [ ! -x "$HOME/.local/bin/kiro-cli" ] || [ "$(wc -c < "$HOME/.local/bin/kiro-cli" 2>/dev/null || echo 0)" -lt 1000 ]; then
+    log "Instalando kiro-cli (zip oficial)..."
+    ARCH="$(uname -m)"
+    case "$ARCH" in
+        x86_64)  K_ARCH="x86_64" ;;
+        aarch64) K_ARCH="aarch64" ;;
+        *)       K_ARCH="" ;;
+    esac
+    if [ -n "$K_ARCH" ]; then
+        TMP="$(mktemp -d)"
+        URL="https://desktop-release.q.us-east-1.amazonaws.com/latest/kirocli-${K_ARCH}-linux.zip"
+        if curl --proto '=https' --tlsv1.2 -fsSL "$URL" -o "$TMP/kirocli.zip"; then
+            (cd "$TMP" && unzip -q kirocli.zip && ./kirocli/install.sh --no-confirm >/dev/null 2>&1 || ./kirocli/install.sh >/dev/null 2>&1) \
+                && log "kiro-cli instalado." || log "Fallo instalacion de kiro-cli (continuo)"
+        else
+            log "No se pudo descargar kiro-cli (continuo)"
+        fi
+        rm -rf "$TMP"
+    fi
 fi
 {{- end }}
 
