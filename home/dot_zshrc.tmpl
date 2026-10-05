@@ -1,4 +1,10 @@
 {{/* ~/.zshrc generado por chezmoi. Perfil: {{ .profile }} */}}
+{{- if eq .profile "vps" }}
+
+# Kiro CLI pre block. Keep at the top of this file.
+[[ -f "${HOME}/.local/share/kiro-cli/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/.local/share/kiro-cli/shell/zshrc.pre.zsh"
+
+{{ end -}}
 # ============================================
 #  zsh - perfil: {{ .profile }}
 # ============================================
@@ -48,9 +54,6 @@ if [ -d "$KIRO_HOME/.git" ]; then
   git -C "$KIRO_HOME" pull --ff-only --quiet 2>/dev/null &!
 fi
 
-# Integracion de kiro-cli (su instalador normalmente anade esto al final del
-# .zshrc; lo incluimos aqui para que chezmoi sea el unico dueño del archivo y no
-# haya conflicto "zshrc has changed since chezmoi last wrote it").
-[ -f "$HOME/.local/share/kiro-cli/shell/zshrc.post.zsh" ] && \
-  builtin source "$HOME/.local/share/kiro-cli/shell/zshrc.post.zsh"
+# Kiro CLI post block. Keep at the bottom of this file.
+[[ -f "${HOME}/.local/share/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/.local/share/kiro-cli/shell/zshrc.post.zsh"
 {{- end }}
