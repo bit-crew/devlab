@@ -118,7 +118,7 @@ GIT_NAME="$(git config --global user.name 2>/dev/null || echo devlab)"
 GIT_EMAIL="$(git config --global user.email 2>/dev/null || echo devlab@localhost)"
 
 log "Aplicando dotfiles con chezmoi (source: $REPO_DIR/home)..."
-chezmoi init --apply --source "$REPO_DIR/home" \
+chezmoi init --apply --force --source "$REPO_DIR/home" \
     --promptDefaults \
     --promptString "profile=$PROFILE" \
     --promptString "gitName=$GIT_NAME" \
