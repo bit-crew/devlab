@@ -42,6 +42,7 @@ export HELIX_RUNTIME="$HOME/.local/share/helix-runtime"
 command -v starship >/dev/null && eval "$(starship init zsh)"
 command -v zoxide   >/dev/null && eval "$(zoxide init zsh)"
 command -v atuin    >/dev/null && eval "$(atuin init zsh)"
+command -v direnv   >/dev/null && eval "$(direnv hook zsh)"
 
 {{- if eq .profile "vps" }}
 

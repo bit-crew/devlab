@@ -27,6 +27,7 @@ ripgrep         both    ripgrep            ripgrep        ripgrep
 fd              both    fd-find            fd             fd
 bat             both    bat                bat            bat
 fzf             both    fzf                fzf            fzf
+direnv          both    direnv             direnv         direnv
 unzip           both    unzip              unzip          -
 build-essential both    build-essential    build-essential -
 pkg-config      both    pkg-config         pkg-config     pkg-config
