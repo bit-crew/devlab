@@ -47,4 +47,10 @@ export KIRO_HOME="$HOME/{{ .agent.home }}"
 if [ -d "$KIRO_HOME/.git" ]; then
   git -C "$KIRO_HOME" pull --ff-only --quiet 2>/dev/null &!
 fi
+
+# Integracion de kiro-cli (su instalador normalmente anade esto al final del
+# .zshrc; lo incluimos aqui para que chezmoi sea el unico dueño del archivo y no
+# haya conflicto "zshrc has changed since chezmoi last wrote it").
+[ -f "$HOME/.local/share/kiro-cli/shell/zshrc.post.zsh" ] && \
+  builtin source "$HOME/.local/share/kiro-cli/shell/zshrc.post.zsh"
 {{- end }}
