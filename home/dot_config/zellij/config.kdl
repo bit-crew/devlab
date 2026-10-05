@@ -1,7 +1,11 @@
 theme "catppuccin-mocha"
 default_layout "compact"
 pane_frames false
-copy_command "xclip -selection clipboard"
+// Copiado via OSC 52: envia el texto al portapapeles del terminal LOCAL (tu
+// tablet/PC) a traves de SSH. No usamos xclip porque el VPS es headless (sin X11)
+// y ademas queremos que la copia llegue a tu dispositivo, no al servidor.
+copy_clipboard "system"
+copy_on_select true
 
 // Custom keybinds to avoid clashing with Helix
 keybinds clear-defaults=true {
