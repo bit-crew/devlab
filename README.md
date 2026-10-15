@@ -37,6 +37,19 @@ También puedes pasar el rol como argumento: `sh setup.sh dc1` o `sh setup.sh vp
 
 También funciona si ya clonaste el repo: `sh setup.sh`.
 
+### Cliente en Windows
+
+En Windows el entorno de edición (helix nativo + LSP + CLI) se instala con
+`setup.ps1` vía scoop, sin tocar ningún `.zshrc` (Windows no usa zsh):
+
+```powershell
+irm https://codeberg.org/jdmb/devlab/raw/branch/main/setup.ps1 | iex
+```
+
+Instala con scoop: helix, lazygit, ripgrep, fd, bat, fzf, delta, zoxide,
+starship, rust-analyzer, taplo, nodejs, uv; basedpyright y yaml-language-server
+(npm); ruff (uv tool). Y aplica la config de helix en `%APPDATA%\helix`.
+
 **Modelo de responsabilidades:** configurar el VPS (con IP+usuario+password)
 solo deja el servidor con el entorno instalado. Enlazar un cliente al VPS por
 clave SSH es tarea de la configuración del cliente: cada máquina (tablet,
