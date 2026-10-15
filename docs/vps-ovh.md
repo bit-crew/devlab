@@ -88,7 +88,7 @@ Con la password permanente ya establecida, desde cualquier PC (no requiere clona
 nada ni tener Python; solo `sh` y `ssh`):
 
 ```
-curl -fsSL https://codeberg.org/jdmb/devlab/raw/branch/main/setup.sh | sh
+curl -fsSL https://raw.githubusercontent.com/bit-crew/devlab/main/setup.sh | sh
 ```
 
 Elige la opción **2) Un VPS remoto (vps)** (o salta el menú con `sh setup.sh vps`).

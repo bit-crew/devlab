@@ -4,7 +4,7 @@
 # .zshrc ni config de shell: Windows usa helix.exe directamente, no zsh.
 #
 # Uso (en PowerShell):
-#   irm https://codeberg.org/jdmb/devlab/raw/branch/main/setup.ps1 | iex
+#   irm https://raw.githubusercontent.com/bit-crew/devlab/main/setup.ps1 | iex
 # O con el repo clonado:
 #   .\setup.ps1
 #
@@ -84,7 +84,7 @@ if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot "home\dot_config\heli
 } else {
     $tmp = Join-Path $env:TEMP "devlab-$(Get-Random)"
     Log "Clonando devlab para obtener la config de helix..."
-    git clone --depth 1 https://codeberg.org/jdmb/devlab.git $tmp
+    git clone --depth 1 https://github.com/bit-crew/devlab.git $tmp
     $repoHome = Join-Path $tmp "home"
 }
 

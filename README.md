@@ -21,7 +21,7 @@ Punto de entrada único para ambos roles (tu máquina cliente o un VPS remoto).
 Desde cualquier dispositivo (Linux, Mac, WSL, Android/Termux):
 
 ```bash
-curl -fsSL https://codeberg.org/jdmb/devlab/raw/branch/main/setup.sh | sh
+curl -fsSL https://raw.githubusercontent.com/bit-crew/devlab/main/setup.sh | sh
 ```
 
 `setup.sh` pregunta qué configurar:
@@ -43,7 +43,7 @@ En Windows el entorno de edición (helix nativo + LSP + CLI) se instala con
 `setup.ps1` vía scoop, sin tocar ningún `.zshrc` (Windows no usa zsh):
 
 ```powershell
-irm https://codeberg.org/jdmb/devlab/raw/branch/main/setup.ps1 | iex
+irm https://raw.githubusercontent.com/bit-crew/devlab/main/setup.ps1 | iex
 ```
 
 Instala con scoop: helix, lazygit, ripgrep, fd, bat, fzf, delta, zoxide,

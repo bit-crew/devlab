@@ -5,7 +5,7 @@
 # caso VPS tambien `ssh`.
 #
 # Uso directo (sin clonar nada):
-#   curl -fsSL https://codeberg.org/jdmb/devlab/raw/branch/main/setup.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/bit-crew/devlab/main/setup.sh | sh
 #
 # O si ya tienes el repo:
 #   sh setup.sh
@@ -23,7 +23,7 @@
 
 set -eu
 
-REPO_URL="https://codeberg.org/jdmb/devlab.git"
+REPO_URL="https://github.com/bit-crew/devlab.git"
 REPO_DIR="devlab"
 
 log() { printf '\033[1;32m[setup]\033[0m %s\n' "$1"; }
