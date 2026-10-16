@@ -15,11 +15,13 @@ use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod binaries;
+
 const BLUE: &str = "\x1b[1;34m";
 const RED: &str = "\x1b[1;31m";
 const RESET: &str = "\x1b[0m";
 
-fn log(msg: &str) {
+pub(crate) fn log(msg: &str) {
     println!("{BLUE}[devlab-install]{RESET} {msg}");
 }
 
@@ -35,7 +37,7 @@ fn main() {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum Profile {
+pub(crate) enum Profile {
     Vps,
     Dc1,
 }
@@ -62,10 +64,11 @@ fn run() -> io::Result<()> {
 
     install_system_packages(&repo, &pkgmgr, profile)?;
     ensure_fd_bat_symlinks();
+    binaries::install_all(profile)?;
     ensure_chezmoi()?;
     apply_dotfiles(&repo, profile)?;
 
-    log("Fase 1a completa: paquetes de sistema + dotfiles aplicados.");
+    log("Fase 1a+1b completa: paquetes, toolchains/binarios y dotfiles.");
     Ok(())
 }
 
