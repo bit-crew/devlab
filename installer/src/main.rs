@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod binaries;
+mod gentle;
 
 const BLUE: &str = "\x1b[1;34m";
 const RED: &str = "\x1b[1;31m";
@@ -65,10 +66,14 @@ fn run() -> io::Result<()> {
     install_system_packages(&repo, &pkgmgr, profile)?;
     ensure_fd_bat_symlinks();
     binaries::install_all(profile)?;
+    // After gentle-ai is installed (VPS), curate it with our content/skills.
+    if profile == Profile::Vps {
+        gentle::curate();
+    }
     ensure_chezmoi()?;
     apply_dotfiles(&repo, profile)?;
 
-    log("Fase 1a+1b completa: paquetes, toolchains/binarios y dotfiles.");
+    log("Instalacion completa.");
     Ok(())
 }
 
