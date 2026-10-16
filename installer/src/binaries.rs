@@ -548,6 +548,19 @@ fn install_vps_infra(e: &Env, arch: Arch) {
     install_sops(e, arch);
     install_wrangler(e);
     install_gcloud(e, arch);
+    install_adk();
+}
+
+/// Google Agent Development Kit (ADK) — the framework CX Agent Studio builds on.
+/// Installed globally via uv (with the a2a extra). GCP is part of the stack.
+fn install_adk() {
+    if !which("uv") || which("adk") {
+        return;
+    }
+    note("Instalando google-adk (uv tool, con extra a2a)...");
+    if !run_ok("uv", &["tool", "install", "google-adk[a2a]"]) {
+        note("fallo uv tool install google-adk (continuo)");
+    }
 }
 
 fn install_aws(e: &Env, _arch: Arch) {
