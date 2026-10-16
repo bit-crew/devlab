@@ -1,0 +1,49 @@
+name: build-installer
+
+# Compiles the devlab-install Rust binary on GitHub's runners (not on the VPS)
+# and publishes it as a "latest" prerelease with a sha256 checksum, so any host
+# can download the prebuilt binary instead of compiling it. Mirrors how gentle-ai
+# ships (CI builds -> GitHub Releases -> curl installer downloads).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "installer/**"
+      - ".github/workflows/build-installer.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # needed to create/update the release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: installer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Build release (x86_64-unknown-linux-gnu)
+        run: cargo build --release
+
+      - name: Stage artifact + checksum
+        working-directory: installer/target/release
+        run: |
+          cp devlab-install devlab-install-x86_64-linux
+          sha256sum devlab-install-x86_64-linux > devlab-install-x86_64-linux.sha256
+          cat devlab-install-x86_64-linux.sha256
+
+      - name: Publish "latest" prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: devlab-install (latest build)
+          prerelease: true
+          files: |
+            installer/target/release/devlab-install-x86_64-linux
+            installer/target/release/devlab-install-x86_64-linux.sha256
