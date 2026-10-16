@@ -114,9 +114,23 @@ fn curl_text(url: &str) -> Option<String> {
 
 /// Run `sh <args>` feeding `script` on stdin. Returns success as bool.
 fn sh_stdin(script: &str, args: &[&str]) -> bool {
+    pipe_to("sh", script, args)
+}
+
+/// Run `bash <args>` feeding `script` on stdin. Some installers (gentle-ai)
+/// are bash-specific and fail under POSIX sh.
+fn bash_stdin(script: &str, args: &[&str]) -> bool {
+    pipe_to("bash", script, args)
+}
+
+/// Spawn `program <args>` and feed `script` to its stdin.
+fn pipe_to(program: &str, script: &str, args: &[&str]) -> bool {
     use std::io::Write as _;
     use std::process::Stdio;
-    let child = Command::new("sh").args(args).stdin(Stdio::piped()).spawn();
+    let child = Command::new(program)
+        .args(args)
+        .stdin(Stdio::piped())
+        .spawn();
     match child {
         Ok(mut c) => {
             if let Some(mut stdin) = c.stdin.take() {
@@ -658,6 +672,29 @@ fn install_vps_infra(e: &Env, arch: Arch) {
     install_wrangler(e);
     install_gcloud(e, arch);
     install_adk();
+    install_gentle();
+}
+
+/// gentle-ai: the agent configurator (installs memory/ODD/skills into OpenCode).
+/// Uses the official installer, same pattern as rustup/uv/Herdr. VPS-only
+/// (agents run on the VPS). Curation of skills happens in a later phase.
+fn install_gentle() {
+    if which("gentle-ai") {
+        return;
+    }
+    note("Instalando gentle-ai (instalador oficial)...");
+    let Some(script) = curl_text(
+        "https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh",
+    ) else {
+        note("no se pudo descargar el instalador de gentle-ai (continuo)");
+        return;
+    };
+    // gentle's installer is bash-specific; pipe it to bash.
+    if bash_stdin(&script, &[]) {
+        note("gentle-ai instalado.");
+    } else {
+        note("fallo instalacion de gentle-ai (continuo)");
+    }
 }
 
 /// Google Agent Development Kit (ADK) — the framework CX Agent Studio builds on.
