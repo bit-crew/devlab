@@ -662,8 +662,9 @@ fn install_nerd_font(e: &Env) {
 
 // --- VPS-only infra ---------------------------------------------------------
 
-/// VPS-only infra tools. Note: kiro-cli is intentionally NOT installed anymore
-/// (removed: superseded by gentle/OpenCode).
+/// VPS-only infra tools. The agent stack is Pi + gentle-ai: Pi is the base
+/// coding agent (gentle-ai refuses to run without it), so it is installed
+/// before gentle-ai. kiro-cli is intentionally NOT installed anymore.
 fn install_vps_infra(e: &Env, arch: Arch) {
     note("Perfil vps: instalando infra...");
     install_aws(e, arch);
@@ -672,28 +673,132 @@ fn install_vps_infra(e: &Env, arch: Arch) {
     install_wrangler(e);
     install_gcloud(e, arch);
     install_adk();
-    install_gentle();
+    install_pi();
+    install_gentle(e, arch);
+    configure_pi_settings(e);
 }
 
-/// gentle-ai: the agent configurator (installs memory/ODD/skills into OpenCode).
-/// Uses the official installer, same pattern as rustup/uv/Herdr. VPS-only
-/// (agents run on the VPS). Curation of skills happens in a later phase.
-fn install_gentle() {
-    if which("gentle-ai") {
-        return;
-    }
-    note("Instalando gentle-ai (instalador oficial)...");
-    let Some(script) = curl_text(
-        "https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh",
-    ) else {
-        note("no se pudo descargar el instalador de gentle-ai (continuo)");
+/// Post-install Pi settings fix. gentle-ai installs the `gentle-pi` package,
+/// which registers a `codemode` tool that collides with Pi's built-in
+/// `codemode` extension; Pi otherwise resolves this on first launch by writing
+/// `-builtin:codemode` into ~/.pi/agent/settings.json. We apply it ahead of
+/// time so the first run is clean. Idempotent merge: the rest of the file
+/// (packages, tuiMode, ...) is preserved. Runs AFTER install_gentle because the
+/// collision only exists once gentle-pi is present. No-op if settings.json is
+/// missing (gentle-ai did not run) or the entry is already there.
+fn configure_pi_settings(e: &Env) {
+    use serde_json::Value;
+
+    let path = e.home.join(".pi").join("agent").join("settings.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        note("~/.pi/agent/settings.json no existe; se omite fix codemode");
         return;
     };
-    // gentle's installer is bash-specific; pipe it to bash.
-    if bash_stdin(&script, &[]) {
-        note("gentle-ai instalado.");
+    let Ok(mut root) = serde_json::from_str::<Value>(&text) else {
+        note("settings.json invalido; se omite fix codemode (continuo)");
+        return;
+    };
+
+    let entry = Value::String("-builtin:codemode".to_string());
+    let Some(obj) = root.as_object_mut() else {
+        note("settings.json: raiz no es objeto; se omite (continuo)");
+        return;
+    };
+    let slot = obj
+        .entry("extensions")
+        .or_insert_with(|| Value::Array(vec![]));
+    let Value::Array(list) = slot else {
+        note("settings.json: 'extensions' no es un arreglo; se omite (continuo)");
+        return;
+    };
+    if list.contains(&entry) {
+        return; // already applied
+    }
+    list.push(entry);
+
+    match serde_json::to_string_pretty(&root) {
+        Ok(out) if std::fs::write(&path, out + "\n").is_ok() => {
+            note("Pi: '-builtin:codemode' agregado a settings.json.");
+        }
+        _ => note("no se pudo escribir settings.json (continuo)"),
+    }
+}
+
+/// Pi — the base coding agent (earendil-works/pi). gentle-ai configures Pi but
+/// does NOT install it: `gentle-ai install --agent pi` fails preflight with
+/// "Pi requires the `pi` executable in PATH" when Pi is missing. The official
+/// Linux/macOS installer pins its dependencies and installs `pi` into
+/// ~/.local/bin (already on PATH). VPS-only; runs before install_gentle.
+fn install_pi() {
+    if which("pi") {
+        return;
+    }
+    note("Instalando Pi (install.sh oficial)...");
+    let Some(script) = curl_text("https://pi.dev/install.sh") else {
+        note("no se pudo descargar install.sh de Pi (continuo)");
+        return;
+    };
+    if sh_stdin(&script, &[]) {
+        note("Pi instalado.");
     } else {
-        note("fallo instalacion de gentle-ai (continuo)");
+        note("fallo instalacion de Pi (continuo)");
+    }
+}
+
+/// gentle-ai: the agent configurator for the Gentleman ecosystem. On Linux
+/// (the VPS) the official method is the install script piped to bash. Once the
+/// binary is present we run the non-interactive setup targeting the Pi agent
+/// (gentle-shell), which provisions the persona + Engram (local) stack. Engram
+/// local is the default (no ENGRAM_CLOUD_* env set). VPS-only; skill curation
+/// happens in a later phase.
+fn install_gentle(_e: &Env, _arch: Arch) {
+    if !which("gentle-ai") {
+        note("Instalando gentle-ai (install.sh oficial)...");
+        let Some(script) = curl_text(
+            "https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh",
+        ) else {
+            note("no se pudo descargar install.sh de gentle-ai (continuo)");
+            return;
+        };
+        // gentle-ai's installer is bash-specific; pipe it to bash.
+        if !bash_stdin(&script, &[]) {
+            note("fallo instalacion de gentle-ai (continuo)");
+            return;
+        }
+    }
+    if !which("gentle-ai") {
+        note("gentle-ai no quedo en PATH; se omite setup (continuo)");
+        return;
+    }
+    // Non-interactive setup for the Pi agent (gentle-shell).
+    // Flags verified against docs/usage.md (CLI Flags: install):
+    //  - scope via GENTLE_AI_INSTALL_SCOPE env (the doc's documented
+    //    non-interactive/CI knob) = global: write to the agent's global config,
+    //    appropriate for a dedicated dev VPS.
+    //  - --pi-background-subagents on: without it a non-interactive run resolves
+    //    `auto` to `off`; we want managed background subagents enabled.
+    //  - --channel stable (default, explicit).
+    // RDD has no install flag (ON by default globally; managed via
+    // `gentle-ai review mode`), so it is intentionally not set here.
+    note("Configurando gentle-ai para Pi (gentle-shell)...");
+    let ok = Command::new("gentle-ai")
+        .args([
+            "install",
+            "--agent",
+            "pi",
+            "--pi-background-subagents",
+            "on",
+            "--channel",
+            "stable",
+        ])
+        .env("GENTLE_AI_INSTALL_SCOPE", "global")
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if ok {
+        note("gentle-ai configurado para Pi.");
+    } else {
+        note("fallo gentle-ai install --agent pi (continuo)");
     }
 }
 
