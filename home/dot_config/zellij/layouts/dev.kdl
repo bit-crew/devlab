@@ -1,0 +1,19 @@
+// Layout de trabajo offline (perfil cliente/dc1): edicion 100% manual.
+// Izquierda 70%: editor Helix. Derecha 30%: lazygit arriba, terminal abajo.
+// Se abre al lanzar `zellij` por ser el default_layout en config.kdl.
+layout {
+    pane split_direction="vertical" {
+        // Editor a la izquierda, 70% del ancho.
+        pane size="70%" {
+            command "hx"
+            args "."
+        }
+        // Columna derecha, 30%: lazygit arriba, terminal abajo.
+        pane split_direction="horizontal" size="30%" {
+            pane {
+                command "lazygit"
+            }
+            pane
+        }
+    }
+}

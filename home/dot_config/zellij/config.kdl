@@ -1,5 +1,5 @@
 theme "catppuccin-mocha"
-default_layout "compact"
+default_layout "dev"
 pane_frames false
 // Copiado via OSC 52: envia el texto al portapapeles del terminal LOCAL (tu
 // tablet/PC) a traves de SSH. No usamos xclip porque el VPS es headless (sin X11)

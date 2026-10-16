@@ -66,7 +66,6 @@ pub fn install_all(profile: Profile) -> io::Result<()> {
     // Shared tools (both profiles).
     install_cargo_tools();
     install_helix(&e, arch);
-    install_zellij(&e, arch);
     install_lazygit(&e, arch);
     install_delta(&e, arch);
     install_marksman(&e, arch);
@@ -75,6 +74,13 @@ pub fn install_all(profile: Profile) -> io::Result<()> {
     install_uv_tools();
     install_yazi(&e, arch);
     install_nerd_font(&e);
+
+    // Multiplexer by profile: Herdr on the VPS (agent-aware, drives Moshi),
+    // zellij on the client (offline manual work with a saved layout).
+    match profile {
+        Profile::Vps => install_herdr(),
+        Profile::Dc1 => install_zellij(&e, arch),
+    }
 
     if profile == Profile::Vps {
         install_vps_infra(&e, arch);
@@ -247,7 +253,47 @@ fn install_helix(e: &Env, arch: Arch) {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
-// --- zellij -----------------------------------------------------------------
+// --- herdr (VPS multiplexer) ------------------------------------------------
+
+/// Herdr: agent-aware multiplexer for the VPS (shows agent state, drives Moshi
+/// over SSH). Installed via the official installer, which downloads the right
+/// release binary onto PATH — same pattern as rustup/uv/chezmoi.
+fn install_herdr() {
+    if which("herdr") {
+        return;
+    }
+    note("Instalando Herdr (instalador oficial)...");
+    // sh -c "$(curl -fsSL https://herdr.dev/install.sh)"
+    let script = match Command::new("curl")
+        .args(["-fsSL", "https://herdr.dev/install.sh"])
+        .output()
+    {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
+        _ => {
+            note("no se pudo descargar el instalador de Herdr (continuo)");
+            return;
+        }
+    };
+    use std::io::Write as _;
+    use std::process::Stdio;
+    let child = Command::new("sh").arg("-s").stdin(Stdio::piped()).spawn();
+    match child {
+        Ok(mut c) => {
+            if let Some(mut stdin) = c.stdin.take() {
+                let _ = stdin.write_all(script.as_bytes());
+            }
+            match c.wait() {
+                Ok(s) if s.success() => note("Herdr instalado."),
+                _ => note("fallo instalacion de Herdr (continuo)"),
+            }
+        }
+        Err(e) => note(&format!(
+            "no se pudo ejecutar sh para Herdr: {e} (continuo)"
+        )),
+    }
+}
+
+// --- zellij (client multiplexer) --------------------------------------------
 
 fn install_zellij(e: &Env, arch: Arch) {
     if which("zellij") {
