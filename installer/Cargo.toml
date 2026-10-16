@@ -1,0 +1,20 @@
+[package]
+name = "devlab-install"
+version = "0.1.0"
+edition = "2021"
+description = "devlab environment installer: system packages, toolchains, binaries, dotfiles (chezmoi), agent (gentle) and moshi-hook"
+license = "MIT"
+
+[[bin]]
+name = "devlab-install"
+path = "src/main.rs"
+
+[dependencies]
+dirs = "5.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"
