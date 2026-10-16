@@ -63,6 +63,9 @@ pub fn install_all(profile: Profile) -> io::Result<()> {
     };
     let e = env()?;
 
+    // Phase 1c first: rustup + uv must exist before cargo/uv tools below.
+    install_toolchains(profile);
+
     // Shared tools (both profiles).
     install_cargo_tools();
     install_helix(&e, arch);
@@ -75,12 +78,10 @@ pub fn install_all(profile: Profile) -> io::Result<()> {
     install_yazi(&e, arch);
     install_nerd_font(&e);
 
-    // Multiplexer by profile: Herdr on the VPS (agent-aware, drives Moshi),
-    // zellij on the client (offline manual work with a saved layout).
-    match profile {
-        Profile::Vps => install_herdr(),
-        Profile::Dc1 => install_zellij(&e, arch),
-    }
+    // Multiplexer: Herdr on both profiles. It is the agent-aware multiplexer on
+    // the VPS (drives Moshi over SSH) and a complete, lighter multiplexer with
+    // saved layouts for offline manual work on the client. One tool, both cases.
+    install_herdr();
 
     if profile == Profile::Vps {
         install_vps_infra(&e, arch);
@@ -99,6 +100,32 @@ fn download(url: &str, dest: &Path) -> bool {
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
+}
+
+/// Fetch a URL's body as text (for piping installer scripts into sh).
+fn curl_text(url: &str) -> Option<String> {
+    let out = Command::new("curl").args(["-fsSL", url]).output().ok()?;
+    if out.status.success() {
+        Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        None
+    }
+}
+
+/// Run `sh <args>` feeding `script` on stdin. Returns success as bool.
+fn sh_stdin(script: &str, args: &[&str]) -> bool {
+    use std::io::Write as _;
+    use std::process::Stdio;
+    let child = Command::new("sh").args(args).stdin(Stdio::piped()).spawn();
+    match child {
+        Ok(mut c) => {
+            if let Some(mut stdin) = c.stdin.take() {
+                let _ = stdin.write_all(script.as_bytes());
+            }
+            c.wait().map(|s| s.success()).unwrap_or(false)
+        }
+        Err(_) => false,
+    }
 }
 
 /// Resolve the latest release tag of a GitHub repo via the API, returning the
@@ -167,6 +194,96 @@ fn rand_suffix() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0)
+}
+
+// --- toolchains (phase 1c: rustup + uv + cargo.txt) -------------------------
+
+/// Install rustup (stable) and uv if missing, then the per-profile tools from
+/// packages/cargo.txt. Ports run_once_10-install-toolchains.sh.
+fn install_toolchains(profile: Profile) {
+    // rustup (stable toolchain), no PATH modification (dotfiles own PATH).
+    if !which("rustup") {
+        note("Instalando rustup (toolchain stable)...");
+        let script = curl_text("https://sh.rustup.rs");
+        if let Some(s) = script {
+            // sh -s -- -y --default-toolchain stable --no-modify-path
+            if !sh_stdin(
+                &s,
+                &[
+                    "-s",
+                    "--",
+                    "-y",
+                    "--default-toolchain",
+                    "stable",
+                    "--no-modify-path",
+                ],
+            ) {
+                note("fallo instalacion de rustup (continuo)");
+            }
+        } else {
+            note("no se pudo descargar rustup (continuo)");
+        }
+    }
+
+    // uv (Python per-project manager).
+    if !which("uv") {
+        note("Instalando uv...");
+        let script = curl_text("https://astral.sh/uv/install.sh");
+        if let Some(s) = script {
+            if !sh_stdin(&s, &["-s"]) {
+                note("fallo instalacion de uv (continuo)");
+            }
+        } else {
+            note("no se pudo descargar uv (continuo)");
+        }
+    }
+
+    install_cargo_txt_tools(profile);
+}
+
+/// Install rustup components and cargo tools listed in packages/cargo.txt,
+/// filtered by profile. Lines: "<item> <profile>". "component:X" -> rustup
+/// component add; otherwise cargo install (if the binary is missing).
+fn install_cargo_txt_tools(profile: Profile) {
+    let path = crate::repo_root().join("packages").join("cargo.txt");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        note(&format!("no se pudo leer {} (continuo)", path.display()));
+        return;
+    };
+    for (item, is_component) in select_cargo_items(&text, profile.as_str()) {
+        if is_component {
+            note(&format!("rustup component add {item}..."));
+            let _ = run_ok("rustup", &["component", "add", &item]);
+        } else if !which(&item) {
+            note(&format!("cargo install {item}..."));
+            if !run_ok("cargo", &["install", &item]) {
+                note(&format!("fallo cargo install {item} (continuo)"));
+            }
+        }
+    }
+}
+
+/// Pure selector for cargo.txt: returns (item, is_component) for the profile.
+fn select_cargo_items(text: &str, profile: &str) -> Vec<(String, bool)> {
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        let item = fields[0];
+        let prof = fields.get(1).copied().unwrap_or("both");
+        if prof != "both" && prof != profile {
+            continue;
+        }
+        if let Some(comp) = item.strip_prefix("component:") {
+            out.push((comp.to_string(), true));
+        } else {
+            out.push((item.to_string(), false));
+        }
+    }
+    out
 }
 
 // --- cargo tools ------------------------------------------------------------
@@ -263,69 +380,15 @@ fn install_herdr() {
         return;
     }
     note("Instalando Herdr (instalador oficial)...");
-    // sh -c "$(curl -fsSL https://herdr.dev/install.sh)"
-    let script = match Command::new("curl")
-        .args(["-fsSL", "https://herdr.dev/install.sh"])
-        .output()
-    {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
-        _ => {
-            note("no se pudo descargar el instalador de Herdr (continuo)");
-            return;
-        }
-    };
-    use std::io::Write as _;
-    use std::process::Stdio;
-    let child = Command::new("sh").arg("-s").stdin(Stdio::piped()).spawn();
-    match child {
-        Ok(mut c) => {
-            if let Some(mut stdin) = c.stdin.take() {
-                let _ = stdin.write_all(script.as_bytes());
-            }
-            match c.wait() {
-                Ok(s) if s.success() => note("Herdr instalado."),
-                _ => note("fallo instalacion de Herdr (continuo)"),
-            }
-        }
-        Err(e) => note(&format!(
-            "no se pudo ejecutar sh para Herdr: {e} (continuo)"
-        )),
-    }
-}
-
-// --- zellij (client multiplexer) --------------------------------------------
-
-fn install_zellij(e: &Env, arch: Arch) {
-    if which("zellij") {
+    let Some(script) = curl_text("https://herdr.dev/install.sh") else {
+        note("no se pudo descargar el instalador de Herdr (continuo)");
         return;
-    }
-    note("Instalando Zellij (binario oficial)...");
-    let a = if arch.is_x86() {
-        "x86_64-unknown-linux-musl"
-    } else {
-        "aarch64-unknown-linux-musl"
     };
-    let Ok(tmp) = tmpdir() else { return };
-    let url =
-        format!("https://github.com/zellij-org/zellij/releases/latest/download/zellij-{a}.tar.gz");
-    let tar = tmp.join("zellij.tar.gz");
-    if download(&url, &tar)
-        && run_ok(
-            "tar",
-            &[
-                "-xf",
-                tar.to_str().unwrap(),
-                "-C",
-                e.local_bin.to_str().unwrap(),
-            ],
-        )
-    {
-        chmod_x(&e.local_bin.join("zellij"));
-        note("Zellij instalado en ~/.local/bin/zellij");
+    if sh_stdin(&script, &["-s"]) {
+        note("Herdr instalado.");
     } else {
-        note("no se pudo instalar Zellij (continuo)");
+        note("fallo instalacion de Herdr (continuo)");
     }
-    let _ = std::fs::remove_dir_all(&tmp);
 }
 
 // --- lazygit ----------------------------------------------------------------
@@ -858,7 +921,7 @@ fn copy_dir(from: &Path, to: &Path) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::version_key;
+    use super::{select_cargo_items, version_key};
 
     #[test]
     fn version_key_parses_segments() {
@@ -877,5 +940,39 @@ mod tests {
         ];
         v.sort_by_key(|n| version_key(n));
         assert!(v.last().unwrap().contains("537.0.0"));
+    }
+
+    const CARGO_TXT: &str = "\
+# comment
+component:rust-analyzer both
+bacon both
+foo-vps vps
+bar-dc1 dc1
+";
+
+    #[test]
+    fn cargo_items_vps_includes_both_and_vps() {
+        let got = select_cargo_items(CARGO_TXT, "vps");
+        assert_eq!(
+            got,
+            vec![
+                ("rust-analyzer".to_string(), true),
+                ("bacon".to_string(), false),
+                ("foo-vps".to_string(), false),
+            ]
+        );
+    }
+
+    #[test]
+    fn cargo_items_dc1_excludes_vps() {
+        let got = select_cargo_items(CARGO_TXT, "dc1");
+        assert_eq!(
+            got,
+            vec![
+                ("rust-analyzer".to_string(), true),
+                ("bacon".to_string(), false),
+                ("bar-dc1".to_string(), false),
+            ]
+        );
     }
 }

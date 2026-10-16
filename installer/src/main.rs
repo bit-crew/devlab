@@ -112,7 +112,7 @@ fn arg_value(flag: &str) -> Option<String> {
 
 /// The devlab repo root. Honors DEVLAB_REPO, else the parent of the installer
 /// crate (installer/ lives inside the repo), else cwd.
-fn repo_root() -> PathBuf {
+pub(crate) fn repo_root() -> PathBuf {
     if let Ok(r) = std::env::var("DEVLAB_REPO") {
         if !r.is_empty() {
             return PathBuf::from(r);
