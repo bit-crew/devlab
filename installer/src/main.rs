@@ -17,6 +17,7 @@ use std::process::Command;
 
 mod binaries;
 mod gentle;
+mod hook;
 
 const BLUE: &str = "\x1b[1;34m";
 const RED: &str = "\x1b[1;31m";
@@ -31,10 +32,33 @@ fn err(msg: &str) {
 }
 
 fn main() {
-    if let Err(e) = run() {
+    let arg = std::env::args().nth(1).unwrap_or_default();
+    let result = match arg.as_str() {
+        "verify" => run_verify(),
+        "hook" => run_hook_install(),
+        _ => run(),
+    };
+    if let Err(e) = result {
         err(&format!("fallo: {e}"));
         std::process::exit(1);
     }
+}
+
+/// `devlab-install verify` — run by the git pre-commit hook. Exit 1 blocks commit.
+fn run_verify() -> io::Result<()> {
+    if hook::verify(&hook::cwd())? {
+        Ok(())
+    } else {
+        std::process::exit(1);
+    }
+}
+
+/// `devlab-install hook` — install the pre-commit hook into the current repo.
+fn run_hook_install() -> io::Result<()> {
+    let exe = std::env::current_exe()?;
+    hook::install(&hook::cwd(), &exe)?;
+    log("Hook de pre-commit instalado (verifica el proyecto antes de cada commit).");
+    Ok(())
 }
 
 #[derive(Clone, Copy, PartialEq)]
