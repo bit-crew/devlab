@@ -17,7 +17,7 @@
 # id            perfil  apt                pkg            brew
 git             both    git                git            git
 openssh-client  both    openssh-client     openssh        openssh
-openssh-server  both    openssh-server     openssh        -
+openssh-server  vps     openssh-server     openssh        -
 zsh             both    zsh                zsh            zsh
 curl            both    curl               curl           curl
 jq              both    jq                 jq             jq
@@ -35,7 +35,6 @@ libssl-dev      both    libssl-dev         openssl        openssl
 
 # --- Solo VPS: Data Engineering / infra ---
 openjdk         vps     openjdk-21-jdk     openjdk-21     openjdk@21
-docker          vps     docker.io          -              -
 age             vps     age                age            age
 clang           vps     clang              clang          -
 clangd          vps     clangd             clang          -
