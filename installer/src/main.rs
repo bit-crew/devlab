@@ -53,6 +53,7 @@ impl Profile {
 }
 
 fn run() -> io::Result<()> {
+    ensure_install_path();
     let profile = resolve_profile()?;
     log(&format!("Perfil: {}", profile.as_str()));
 
@@ -78,6 +79,25 @@ fn run() -> io::Result<()> {
 }
 
 // --- profile + paths --------------------------------------------------------
+
+/// Prepend the install locations to this process's PATH so every subprocess
+/// (gentle's installer, cargo/uv tools, node-based LSPs) can find binaries that
+/// were just installed, before the shell dotfiles that set PATH are applied.
+/// Mirrors the `export PATH=...` the old run_once scripts did at their start.
+fn ensure_install_path() {
+    let Some(home) = dirs::home_dir() else { return };
+    let extra = [
+        home.join(".cargo").join("bin"),
+        home.join(".local").join("bin"),
+        home.join(".local").join("node").join("bin"),
+    ];
+    let current = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths: Vec<PathBuf> = extra.to_vec();
+    paths.extend(std::env::split_paths(&current));
+    if let Ok(joined) = std::env::join_paths(paths) {
+        std::env::set_var("PATH", joined);
+    }
+}
 
 /// Resolve the profile: --profile <p>, else DEVLAB_PROFILE, else prompt
 /// (default vps). Non-interactive stdin defaults to vps.
