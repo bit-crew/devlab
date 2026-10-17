@@ -91,7 +91,7 @@ fn run() -> io::Result<()> {
     install_system_packages(&repo, &pkgmgr, profile)?;
     ensure_fd_bat_symlinks();
     binaries::install_all(profile)?;
-    // After gentle-ai is installed (VPS), curate it with our content/skills.
+    // After gentle-ai is installed (VPS), curate it with prim-skills content.
     if profile == Profile::Vps {
         gentle::curate();
     }

@@ -3,7 +3,7 @@
 //!
 //! Mirrors the shell precedence: prefer an upstream release binary; a few Rust
 //! tools are built with cargo when no good binary exists. kiro-cli is NOT ported
-//! (removed: superseded by gentle/OpenCode).
+//! (removed: superseded by Pi/gentle-ai).
 //!
 //! Idempotent: each tool installs only when its binary is missing. Failures are
 //! non-fatal (logged, continue) to match the shell's resilient behavior.

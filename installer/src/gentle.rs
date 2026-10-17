@@ -1,22 +1,25 @@
-//! Phase 2c: curate gentle after installing it (Option A — by files, deterministic).
+//! Phase 2c: curate gentle/Pi after installing it (Option A — by files).
 //!
-//! gentle-ai configures OpenCode with its own skills/memory/ODD. On top of that
-//! we curate for our stack:
-//!   - install OUR content skills into OpenCode's skills dir,
-//!   - concatenate OUR instructions into AGENTS.md,
+//! The content (skills + instructions + manifest) is NOT vendored here: it
+//! lives in the standalone `bit-crew/prim-skills` repo so any agent can reuse
+//! it. This module clones that repo to a temp dir, curates it into the Pi /
+//! gentle-ai install, then removes the clone so no content lingers on the VPS.
+//!
+//! Curation on top of what gentle-ai already provisions:
+//!   - install OUR skills into Pi's user skills dir (~/.pi/agent/skills),
+//!   - concatenate OUR instructions into Pi's AGENTS.md,
 //!   - remove only hermes-ephemeral-delegation (not our agent),
-//!   - ensure Engram is LOCAL only (no Engram Cloud),
-//!   - regenerate the skill index (gentle-ai skill-registry refresh).
+//!   - keep Engram LOCAL only (no Engram Cloud),
+//!   - refresh the skill registry so Pi sees the curated set.
 //!
-//! We do NOT remove go-testing, gentle-ai-bench, jira-*, pytest, etc.: skills
-//! that don't match a trigger simply never activate, so pruning them is not
-//! worth it. Only hermes is removed.
+//! Pi's user skill scan roots are defined by gentle-pi's skill-registry; the
+//! canonical one for Pi is ~/.pi/agent/skills (verified against gentle-pi).
+//!
+//! Non-fatal: logs and continues, so a partial install does not abort.
 
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-
-use crate::repo_root;
 
 const BLUE: &str = "\x1b[1;34m";
 const RESET: &str = "\x1b[0m";
@@ -25,50 +28,66 @@ fn note(msg: &str) {
     println!("{BLUE}[gentle]{RESET} {msg}");
 }
 
-/// Skills removed from OpenCode after gentle installs (only ones that don't
-/// apply to our agent at all).
+/// Content repo cloned at install time (content only, agent-agnostic).
+const SKILLS_REPO: &str = "https://github.com/bit-crew/prim-skills.git";
+
+/// Skills removed after gentle installs (only ones that don't apply to us).
 const SKILLS_TO_REMOVE: &[&str] = &["hermes-ephemeral-delegation"];
 
-/// OpenCode config root (XDG-aware), same resolution as the agent adapter.
-fn opencode_root(home: &Path) -> PathBuf {
-    if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
-        if Path::new(&xdg).is_absolute() {
-            return Path::new(&xdg).join("opencode");
-        }
-    }
-    home.join(".config").join("opencode")
+/// Pi's user skills directory (the canonical scan root for the Pi agent).
+fn pi_skills_dir(home: &Path) -> PathBuf {
+    home.join(".pi").join("agent").join("skills")
+}
+
+/// Pi's agent config dir, where AGENTS.md lives.
+fn pi_agent_dir(home: &Path) -> PathBuf {
+    home.join(".pi").join("agent")
 }
 
 /// Run the full curation. Called after gentle-ai is installed (VPS profile).
-/// Non-fatal: logs and continues, so a partial gentle install doesn't abort.
 pub fn curate() {
     let Some(home) = dirs::home_dir() else {
         note("sin HOME; se omite la curaduria.");
         return;
     };
-    let oc = opencode_root(&home);
-    let content = repo_root().join("content");
-    if !content.exists() {
-        note(&format!(
-            "no existe {} ; se omite la curaduria.",
-            content.display()
-        ));
-        return;
-    }
 
-    install_our_skills(&content, &oc);
-    append_our_instructions(&content, &oc);
-    remove_unwanted_skills(&oc);
-    ensure_engram_local(&oc);
+    // Clone the content repo to a temp dir; remove it at the end.
+    let Some(content) = clone_content() else {
+        note("no se pudo clonar prim-skills; se omite la curaduria.");
+        return;
+    };
+
+    install_our_skills(&content, &pi_skills_dir(&home));
+    append_our_instructions(&content, &pi_agent_dir(&home));
+    remove_unwanted_skills(&pi_skills_dir(&home));
+    ensure_engram_local();
     refresh_index();
 
-    note("Curaduria de gentle completa.");
+    let _ = std::fs::remove_dir_all(&content);
+    note("Curaduria de Pi/gentle completa (clon de prim-skills eliminado).");
 }
 
-/// Copy our content/skills/* into OpenCode's skills dir.
-fn install_our_skills(content: &Path, oc: &Path) {
+/// Clone prim-skills into a fresh temp dir. Returns the clone path on success.
+fn clone_content() -> Option<PathBuf> {
+    let base = std::env::temp_dir().join(format!("prim-skills-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    note("Clonando prim-skills (contenido agnostico)...");
+    let ok = Command::new("git")
+        .args(["clone", "--depth", "1", SKILLS_REPO])
+        .arg(&base)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if ok {
+        Some(base)
+    } else {
+        None
+    }
+}
+
+/// Copy content/skills/* into Pi's user skills dir.
+fn install_our_skills(content: &Path, dst_root: &Path) {
     let from_root = content.join("skills");
-    let to_root = oc.join("skills");
     let Ok(entries) = std::fs::read_dir(&from_root) else {
         note(&format!(
             "no se pudieron leer skills en {}",
@@ -76,12 +95,12 @@ fn install_our_skills(content: &Path, oc: &Path) {
         ));
         return;
     };
-    let _ = std::fs::create_dir_all(&to_root);
+    let _ = std::fs::create_dir_all(dst_root);
     let mut n = 0;
     for entry in entries.filter_map(|e| e.ok()) {
         let p = entry.path();
         if p.is_dir() {
-            let dst = to_root.join(entry.file_name());
+            let dst = dst_root.join(entry.file_name());
             if copy_dir(&p, &dst).is_ok() {
                 n += 1;
             }
@@ -89,21 +108,20 @@ fn install_our_skills(content: &Path, oc: &Path) {
     }
     note(&format!(
         "{n} skills propias instaladas en {}",
-        to_root.display()
+        dst_root.display()
     ));
 }
 
-/// Append our always-on instructions to OpenCode's AGENTS.md. Strips the YAML
+/// Append our always-on instructions to Pi's AGENTS.md. Strips the YAML
 /// frontmatter of each file and resolves the ODD memory marker (Engram is on).
-fn append_our_instructions(content: &Path, oc: &Path) {
-    // Order matters; mirror content/manifest.toml always-on instructions.
+fn append_our_instructions(content: &Path, agent_dir: &Path) {
+    // Order matters; mirror manifest.toml always-on instructions.
     let files = ["tech.md", "code-conventions.md", "odd.md"];
-    let mut body = String::from("\n<!-- Managed by devlab-install. Source: devlab/content -->\n\n");
+    let mut body = String::from("\n<!-- Managed by devlab-install. Source: prim-skills -->\n\n");
     for f in files {
         match std::fs::read_to_string(content.join("instructions").join(f)) {
             Ok(raw) => {
                 let text = strip_frontmatter(&raw);
-                // Engram (local) is the memory, so fill the ODD memory marker.
                 let text = text.replace("<!-- ODD_MEMORY -->\n", ODD_MEMORY_STEPS);
                 body.push_str(&text);
                 body.push_str("\n\n");
@@ -118,8 +136,8 @@ fn append_our_instructions(content: &Path, oc: &Path) {
         body.push_str("\n\n");
     }
 
-    let path = oc.join("AGENTS.md");
-    let _ = std::fs::create_dir_all(oc);
+    let path = agent_dir.join("AGENTS.md");
+    let _ = std::fs::create_dir_all(agent_dir);
     // Append to whatever gentle already wrote, don't clobber it.
     let mut existing = std::fs::read_to_string(&path).unwrap_or_default();
     existing.push_str(&body);
@@ -138,22 +156,18 @@ const ODD_MEMORY_STEPS: &str = "\
    instead of resetting. After significant work, save the decision or learning.\n\n";
 
 /// Remove skills that don't apply to our agent (only hermes).
-fn remove_unwanted_skills(oc: &Path) {
-    let skills = oc.join("skills");
+fn remove_unwanted_skills(skills_dir: &Path) {
     for name in SKILLS_TO_REMOVE {
-        let dir = skills.join(name);
+        let dir = skills_dir.join(name);
         if dir.exists() && std::fs::remove_dir_all(&dir).is_ok() {
             note(&format!("skill '{name}' eliminada."));
         }
     }
 }
 
-/// Ensure Engram runs LOCAL only (no Engram Cloud autosync). We do not enable
-/// any cloud env; this is a guard note plus leaving cloud untouched. If gentle
-/// exposes a toggle, prefer local. (Local is Engram's default.)
-fn ensure_engram_local(_oc: &Path) {
-    // Engram is local-first by default; we deliberately do NOT set
-    // ENGRAM_CLOUD_* or enable autosync. Nothing to write — just assert intent.
+/// Keep Engram LOCAL only. We deliberately do NOT set ENGRAM_CLOUD_* or enable
+/// autosync; local is Engram's default. This is an intent assertion.
+fn ensure_engram_local() {
     note("Engram en modo local (sin Engram Cloud).");
 }
 
