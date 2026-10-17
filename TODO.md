@@ -22,5 +22,6 @@ Cuando prim tenga CLI, devlab sera invocable con:
 ```
 prim setup --perfil tech
 ```
-Que internamente clona devlab y ejecuta `./bootstrap.sh vps` (o `dc1`).
+Que internamente clona devlab y ejecuta el binario `devlab-install` con perfil
+`vps` (o `dc1`).
 Por ahora no se implementa, solo se documenta.

@@ -1,7 +1,7 @@
 # VPS en OVHcloud — compra manual y configuración
 
 Este documento cubre la compra manual del VPS (una vez) y cómo configurarlo con
-`setup.sh`. El VPS se compra a mano; todo lo repetible (instalar el entorno) se
+`install.sh`. El VPS se compra a mano; todo lo repetible (instalar el entorno) se
 automatiza.
 
 ## Por qué la compra es manual
@@ -65,7 +65,7 @@ Del correo de aprovisionamiento de OVH necesitas:
 
 OVH obliga a cambiar la password temporal por una permanente en el **primer
 login**. Este paso es interactivo (flujo de seguridad del sistema) y **se hace a
-mano antes de usar `setup.sh`**:
+mano antes de usar `install.sh`**:
 
 ```
 ssh debian@<IP>
@@ -73,7 +73,7 @@ ssh debian@<IP>
 
 Al entrar con la password temporal, el sistema pedirá la temporal de nuevo y la
 nueva password permanente (dos veces). A partir de ahí, la **password
-permanente** es la que usa `setup.sh`.
+permanente** es la que usa `install.sh`.
 
 No se automatiza: es una sola vez por VPS y es un flujo interactivo de PAM que no
 encaja en la ejecución de un comando remoto.
@@ -88,10 +88,10 @@ Con la password permanente ya establecida, desde cualquier PC (no requiere clona
 nada ni tener Python; solo `sh` y `ssh`):
 
 ```
-curl -fsSL https://raw.githubusercontent.com/bit-crew/devlab/main/setup.sh | sh
+curl -fsSL https://raw.githubusercontent.com/bit-crew/devlab/main/install.sh | sh
 ```
 
-Elige la opción **2) Un VPS remoto (vps)** (o salta el menú con `sh setup.sh vps`).
+Elige la opción **2) VPS remoto** (o salta el menú con `sh install.sh vps`).
 El script pregunta:
 - IP pública del VPS
 - Usuario SSH (default `debian`)
@@ -99,14 +99,16 @@ El script pregunta:
 Se conecta por SSH y **pide la password permanente del VPS** cuando la necesita.
 Luego, de forma idempotente:
 
-1. Instala `git`/`curl` en el VPS si faltan (arranque en frío).
-2. Clona o actualiza este repo dentro del VPS.
-3. Ejecuta `./bootstrap.sh vps`: paquetes apt, chezmoi, dotfiles,
-   rustup/uv/cargo, binarios (helix, zellij, etc.) y clonado del agente.
+1. Instala `curl` en el VPS si falta (arranque en frío).
+2. Descarga el binario `devlab-install` desde la release `latest` y verifica su
+   checksum.
+3. Ejecuta el binario con perfil `vps`: paquetes del sistema, chezmoi + dotfiles,
+   rustup/uv/cargo, binarios (helix, herdr, etc.), infra (AWS/Terraform/sops/GCP)
+   y el agente (Pi + gentle-ai).
 
 El resultado es un VPS con el entorno devlab instalado. El acceso por clave SSH
 (para no volver a teclear la password) lo configura el **cliente** al enlazarse,
-en su propio flujo (`setup.sh` → opción dc1).
+en su propio flujo (`install.sh` → opción dc1).
 
 ### VPS actual
 

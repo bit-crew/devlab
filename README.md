@@ -18,37 +18,30 @@ Sin Nix. La gestión es:
 ## Despliegue con un solo comando
 
 Punto de entrada único para ambos roles (tu máquina cliente o un VPS remoto).
-Desde cualquier dispositivo (Linux, Mac, WSL, Android/Termux):
+Desde cualquier dispositivo Linux (incluido Android/Termux, arm64 — próximamente):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bit-crew/devlab/main/setup.sh | sh
+curl -fsSL https://raw.githubusercontent.com/bit-crew/devlab/main/install.sh | sh
 ```
 
-`setup.sh` pregunta qué configurar:
+`install.sh` descarga el binario precompilado `devlab-install` (publicado por
+GitHub Actions en la release `latest`), verifica su checksum y lo ejecuta. Toda
+la lógica de instalación vive en ese binario Rust.
 
-1. **Esta máquina como cliente (dc1)** — instalará el entorno local y enlazará
-   este cliente al VPS generando su propia clave SSH. (En desarrollo.)
-2. **Un VPS remoto (vps)** — pregunta IP y usuario del VPS, se conecta por SSH
-   con la password (la temporal de OVH), clona el repo en el VPS y corre
-   `bootstrap.sh vps`. Se puede hacer desde cualquier PC; no instala claves SSH.
+Primero pregunta qué configurar:
+
+1. **Cliente (este equipo, perfil dc1)** — baja y ejecuta el binario aquí.
+2. **VPS remoto (perfil vps)** — pregunta IP y usuario del VPS, se conecta por
+   SSH (con la password temporal de OVH) y corre `install.sh` allá en modo
+   local con perfil `vps`. Se puede hacer desde cualquier PC; no instala claves
+   SSH.
 
 No requiere clonar nada ni tener Python: solo `sh` (y `ssh` para el VPS).
-También puedes pasar el rol como argumento: `sh setup.sh dc1` o `sh setup.sh vps`.
+También puedes pasar el rol como argumento: `sh install.sh dc1` o
+`sh install.sh vps`.
 
-También funciona si ya clonaste el repo: `sh setup.sh`.
-
-### Cliente en Windows
-
-En Windows el entorno de edición (helix nativo + LSP + CLI) se instala con
-`setup.ps1` vía scoop, sin tocar ningún `.zshrc` (Windows no usa zsh):
-
-```powershell
-irm https://raw.githubusercontent.com/bit-crew/devlab/main/setup.ps1 | iex
-```
-
-Instala con scoop: helix, lazygit, ripgrep, fd, bat, fzf, delta, zoxide,
-starship, rust-analyzer, taplo, nodejs, uv; basedpyright y yaml-language-server
-(npm); ruff (uv tool). Y aplica la config de helix en `%APPDATA%\helix`.
+Hoy el binario se compila solo para `x86_64-linux`; otros objetivos
+(Android/arm64, macOS, Windows) se añadirán cuando el CI los produzca.
 
 **Modelo de responsabilidades:** configurar el VPS (con IP+usuario+password)
 solo deja el servidor con el entorno instalado. Enlazar un cliente al VPS por
@@ -66,15 +59,16 @@ laptop) genera su clave y la registra en el VPS.
 
 Reparto de herramientas (resumen):
 
-- **Ambos:** git, openssh, zsh, curl, jq, helix, zellij, lazygit, yazi, ripgrep,
+- **Ambos:** git, openssh, zsh, curl, jq, helix, herdr, lazygit, yazi, ripgrep,
   fd, fzf, bat, zoxide, eza, atuin, starship, chezmoi, uv, Python (vía uv),
   rustup + rust-analyzer.
-- **Solo VPS:** JDK (PySpark para tests), Docker, AWS CLI, Terraform, sops, age,
-  toolchain C/C++ + clangd.
+- **Solo VPS:** JDK (PySpark para tests), AWS CLI, Terraform, sops, age,
+  GCP SDK, toolchain C/C++ + clangd, y el agente (Pi + gentle-ai).
 
-Lo que está en el apt oficial de Debian se instala por apt (`packages/apt.txt`);
-las herramientas modernas en Rust y algunos binarios (helix, zellij, lazygit,
-terraform, aws-cli, sops) se instalan por cargo/binario en un `run_once`.
+Los paquetes del sistema se declaran en `packages/system.txt` (por perfil y
+gestor: apt/pkg/brew); las herramientas en Rust y algunos binarios (helix,
+herdr, lazygit, terraform, aws-cli, sops) los instala el binario
+`devlab-install` desde release/cargo.
 
 ---
 
@@ -82,44 +76,40 @@ terraform, aws-cli, sops) se instalan por cargo/binario en un `run_once`.
 
 ```text
 devlab/
-├── setup.sh                  # punto de entrada unico (cliente o VPS)
-├── bootstrap.sh              # server-setup: apt + chezmoi init --apply
+├── install.sh                # punto de entrada: baja y ejecuta el binario
+├── installer/                # binario Rust devlab-install (toda la logica)
+│   ├── Cargo.toml
+│   └── src/
 ├── docs/
 │   └── vps-ovh.md            # compra manual del VPS y flujo de despliegue
 ├── packages/
-│   ├── apt.txt               # paquetes Debian por perfil (both|dc1|vps)
+│   ├── system.txt            # paquetes del sistema por perfil y gestor
 │   └── cargo.txt             # componentes rustup + herramientas cargo
-├── home/                     # source de chezmoi
+├── home/                     # source de chezmoi (dotfiles)
 │   ├── .chezmoi.toml.tmpl
 │   ├── .chezmoidata.yaml
 │   ├── dot_gitconfig.tmpl
 │   ├── dot_zshrc.tmpl
-│   ├── dot_config/           # helix, zellij, lazygit, atuin
-│   ├── run_once_10-install-toolchains.sh.tmpl  # rustup + uv + cargo
-│   ├── run_once_15-install-binaries.sh.tmpl    # helix, zellij, terraform...
-│   └── run_once_20-clone-agent.sh.tmpl         # clona steering (solo VPS)
-├── .github/workflows/        # CI: shellcheck + render de plantillas
+│   └── dot_config/           # helix, lazygit, atuin, ...
+├── content/                  # steering/skills del agente (gentle/Pi)
+├── .github/workflows/        # CI: build del binario + validacion
 └── README.md
 ```
 
 ---
 
-## bootstrap.sh (dentro del VPS)
+## El binario devlab-install
 
-`setup.sh` lo ejecuta por ti, pero también puedes correrlo manual:
+`install.sh` lo descarga y ejecuta por ti, pero el binario es autónomo:
 
-```bash
-./bootstrap.sh dc1   # máquina local
-./bootstrap.sh vps   # servidor
-```
+1. Instala los paquetes de `packages/system.txt` que aplican al perfil
+   (detecta apt/pkg/brew).
+2. Instala toolchains (rustup, uv), binarios (helix, lazygit, ...) y, en el
+   perfil vps, la infra (AWS/Terraform/sops/GCP) y el agente (Pi + gentle-ai).
+3. Instala `chezmoi` y aplica los dotfiles de `home/` para el perfil.
 
-1. Instala los paquetes de `packages/apt.txt` que aplican al perfil.
-2. Crea symlinks `fd`->`fdfind` y `bat`->`batcat` (nombres de Debian).
-3. Instala `chezmoi` en `~/.local/bin` si falta.
-4. Ejecuta `chezmoi init --apply`, que aplica dotfiles y corre los `run_once`
-   (rustup, uv, cargo, binarios y, en VPS, clona el repo de steering).
-
-Es **idempotente**: puedes volver a correrlo sin romper nada.
+Es **idempotente**: cada herramienta se instala solo si falta, así que puedes
+volver a correrlo sin romper nada.
 
 ---
 
@@ -166,7 +156,10 @@ background al abrir la shell.
 
 ## CI
 
+`.github/workflows/build-installer.yml` compila el binario `devlab-install` en
+cada push a `installer/**` y lo publica como prerelease `latest` con su sha256.
+
 `.github/workflows/validate.yml` valida en cada push/PR:
 
-- `shellcheck` sobre `bootstrap.sh`.
+- `shellcheck` sobre `install.sh`.
 - Render de las plantillas chezmoi para ambos perfiles `dc1` y `vps`.

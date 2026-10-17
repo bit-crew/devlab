@@ -15,8 +15,8 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
-      - name: Lint shell scripts
-        run: shellcheck setup.sh bootstrap.sh
+      - name: Lint install.sh
+        run: shellcheck install.sh
 
   chezmoi-templates:
     runs-on: ubuntu-latest
@@ -27,14 +27,24 @@ jobs:
         run: sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
 
       - name: Render templates for both profiles
+        # Two-step: `chezmoi init` runs home/.chezmoi.toml.tmpl (which calls
+        # promptStringOnce) to produce a config file with [data] (profile,
+        # gitName, gitEmail); then `execute-template --config <that>` renders
+        # the data templates with those keys populated. `execute-template --init`
+        # alone does NOT evaluate the config template, so .profile would be
+        # missing (verified). --promptString matches by prompt TEXT.
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           for profile in dc1 vps; do
             echo "=== profile: $profile ==="
-            chezmoi execute-template \
-              --init --promptString "profile=$profile,gitName=CI,gitEmail=ci@example.com" \
-              < home/dot_zshrc.tmpl
-            chezmoi execute-template \
-              --init --promptString "profile=$profile,gitName=CI,gitEmail=ci@example.com" \
-              < home/dot_config/helix/languages.toml.tmpl
+            cfg="$(mktemp -d)/chezmoi.toml"
+            chezmoi init --source home --config-path "$cfg" \
+              --promptString "Perfil (dc1|vps)=$profile" \
+              --promptString "Nombre para git=CI" \
+              --promptString "Email para git=ci@example.com"
+            chezmoi execute-template --source home --config "$cfg" \
+              < home/dot_zshrc.tmpl > /dev/null
+            chezmoi execute-template --source home --config "$cfg" \
+              < home/dot_config/helix/languages.toml.tmpl > /dev/null
+            echo "render OK"
           done
