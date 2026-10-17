@@ -259,12 +259,8 @@ fn install_toolchains(profile: Profile) {
 /// filtered by profile. Lines: "<item> <profile>". "component:X" -> rustup
 /// component add; otherwise cargo install (if the binary is missing).
 fn install_cargo_txt_tools(profile: Profile) {
-    let path = crate::repo_root().join("packages").join("cargo.txt");
-    let Ok(text) = std::fs::read_to_string(&path) else {
-        note(&format!("no se pudo leer {} (continuo)", path.display()));
-        return;
-    };
-    for (item, is_component) in select_cargo_items(&text, profile.as_str()) {
+    let text = include_str!("data/cargo.txt");
+    for (item, is_component) in select_cargo_items(text, profile.as_str()) {
         if is_component {
             note(&format!("rustup component add {item}..."));
             let _ = run_ok("rustup", &["component", "add", &item]);

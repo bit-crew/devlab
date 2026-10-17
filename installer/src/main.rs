@@ -12,7 +12,7 @@
 //! else prompt. Non-interactive when stdin is not a TTY.
 
 use std::io::{self, IsTerminal, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 mod binaries;
@@ -81,14 +81,11 @@ fn run() -> io::Result<()> {
     let profile = resolve_profile()?;
     log(&format!("Perfil: {}", profile.as_str()));
 
-    let repo = repo_root();
-    log(&format!("Repo devlab: {}", repo.display()));
-
     let pkgmgr = detect_pkgmgr()
         .ok_or_else(|| io::Error::other("gestor no soportado (no hay apt, pkg ni brew)"))?;
     log(&format!("Gestor de paquetes: {}", pkgmgr.name));
 
-    install_system_packages(&repo, &pkgmgr, profile)?;
+    install_system_packages(&pkgmgr, profile)?;
     ensure_fd_bat_symlinks();
     binaries::install_all(profile)?;
     // After gentle-ai is installed (VPS), curate it with prim-skills content.
@@ -96,7 +93,7 @@ fn run() -> io::Result<()> {
         gentle::curate();
     }
     ensure_chezmoi()?;
-    apply_dotfiles(&repo, profile)?;
+    apply_dotfiles(profile)?;
 
     log("Instalacion completa.");
     Ok(())
@@ -159,20 +156,6 @@ fn arg_value(flag: &str) -> Option<String> {
         .and_then(|i| args.get(i + 1).cloned())
 }
 
-/// The devlab repo root. Honors DEVLAB_REPO, else the parent of the installer
-/// crate (installer/ lives inside the repo), else cwd.
-pub(crate) fn repo_root() -> PathBuf {
-    if let Ok(r) = std::env::var("DEVLAB_REPO") {
-        if !r.is_empty() {
-            return PathBuf::from(r);
-        }
-    }
-    std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.ancestors().nth(4).map(Path::to_path_buf))
-        .unwrap_or_else(|| PathBuf::from("."))
-}
-
 // --- package manager detection ----------------------------------------------
 
 struct PkgMgr {
@@ -225,12 +208,13 @@ fn which(bin: &str) -> bool {
 /// Parse packages/system.txt and install the packages for this profile using
 /// the detected manager's column. Columns: 0=id 1=profile 2=apt 3=pkg 4=brew.
 /// A "-" means "not available in that manager". Skips comments and blanks.
-fn install_system_packages(repo: &Path, mgr: &PkgMgr, profile: Profile) -> io::Result<()> {
-    let file = repo.join("packages").join("system.txt");
-    let text = std::fs::read_to_string(&file)
-        .map_err(|e| io::Error::other(format!("no se pudo leer {}: {e}", file.display())))?;
+///
+/// The package list is embedded at compile time (include_str!) so the binary is
+/// standalone: it does not need the devlab repo cloned on the target host.
+fn install_system_packages(mgr: &PkgMgr, profile: Profile) -> io::Result<()> {
+    let text = include_str!("data/system.txt");
 
-    let pkgs = select_packages(&text, mgr.column, profile.as_str());
+    let pkgs = select_packages(text, mgr.column, profile.as_str());
 
     if pkgs.is_empty() {
         log(&format!(
@@ -349,9 +333,26 @@ fn ensure_chezmoi() -> io::Result<()> {
 // --- dotfiles via chezmoi ---------------------------------------------------
 
 /// Apply dotfiles with chezmoi, source = <repo>/home. Passes profile + git
-/// identity as prompt defaults, matching the old bootstrap.sh invocation.
-fn apply_dotfiles(repo: &Path, profile: Profile) -> io::Result<()> {
-    let source = repo.join("home");
+/// Apply dotfiles with chezmoi. The dotfiles live in devlab/home, which is not
+/// present when the binary runs standalone, so we shallow-clone devlab to a temp
+/// dir, apply from <clone>/home, and remove the clone. Passes profile + git
+/// identity as prompt values (matching home/.chezmoi.toml.tmpl prompt texts).
+fn apply_dotfiles(profile: Profile) -> io::Result<()> {
+    let tmp = std::env::temp_dir().join(format!("devlab-dotfiles-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    log("Clonando devlab para los dotfiles (home/)...");
+    run_cmd(
+        "git",
+        &[
+            "clone",
+            "--depth",
+            "1",
+            "https://github.com/bit-crew/devlab.git",
+            tmp.to_str().unwrap(),
+        ],
+    )?;
+    let source = tmp.join("home");
+
     let git_name = capture("git", &["config", "--global", "user.name"])
         .map(|s| s.trim().to_string())
         .ok()
@@ -367,7 +368,8 @@ fn apply_dotfiles(repo: &Path, profile: Profile) -> io::Result<()> {
         "Aplicando dotfiles con chezmoi (source: {})",
         source.display()
     ));
-    run_cmd(
+    // --promptString matches by prompt TEXT (see home/.chezmoi.toml.tmpl).
+    let res = run_cmd(
         "chezmoi",
         &[
             "init",
@@ -375,15 +377,16 @@ fn apply_dotfiles(repo: &Path, profile: Profile) -> io::Result<()> {
             "--force",
             "--source",
             source.to_str().unwrap(),
-            "--promptDefaults",
             "--promptString",
-            &format!("profile={}", profile.as_str()),
+            &format!("Perfil (dc1|vps)={}", profile.as_str()),
             "--promptString",
-            &format!("gitName={git_name}"),
+            &format!("Nombre para git={git_name}"),
             "--promptString",
-            &format!("gitEmail={git_email}"),
+            &format!("Email para git={git_email}"),
         ],
-    )
+    );
+    let _ = std::fs::remove_dir_all(&tmp);
+    res
 }
 
 // --- command helpers --------------------------------------------------------
