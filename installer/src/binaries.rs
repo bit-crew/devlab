@@ -717,10 +717,14 @@ fn configure_pi_settings(e: &Env) {
     list.push(entry);
 
     match serde_json::to_string_pretty(&root) {
-        Ok(out) if std::fs::write(&path, out + "\n").is_ok() => {
-            note("Pi: '-builtin:codemode' agregado a settings.json.");
+        Ok(out) => {
+            if std::fs::write(&path, out + "\n").is_ok() {
+                note("Pi: '-builtin:codemode' agregado a settings.json.");
+            } else {
+                note("no se pudo escribir settings.json (continuo)");
+            }
         }
-        _ => note("no se pudo escribir settings.json (continuo)"),
+        Err(_) => note("no se pudo serializar settings.json (continuo)"),
     }
 }
 
