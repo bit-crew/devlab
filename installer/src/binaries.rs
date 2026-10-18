@@ -73,6 +73,7 @@ pub fn install_all(profile: Profile) -> io::Result<()> {
     install_delta(&e, arch);
     install_marksman(&e, arch);
     install_node(&e, arch);
+    install_go(&e, arch);
     install_npm_lsps(&e);
     install_uv_tools();
     install_yazi(&e, arch);
@@ -555,6 +556,75 @@ fn node_latest_version() -> Option<String> {
     let a = seg2.find('"')? + 1;
     let b = seg2[a..].find('"')? + a;
     Some(seg2[a..b].to_string())
+}
+
+// --- Go toolchain -----------------------------------------------------------
+
+/// Go toolchain (official tarball) under ~/.local/go. First-class tool for both
+/// profiles: the dotfiles add ~/.local/go/bin (the toolchain) and ~/go/bin
+/// (GOPATH bin, where `go install` places binaries) to PATH. gentle-ai also
+/// uses Go to build engram, but here Go is installed as a usable tool, not a
+/// transient build dependency. Same tarball pattern as Node.
+fn install_go(e: &Env, arch: Arch) {
+    // The toolchain binary lives at ~/.local/go/bin/go.
+    if e.home
+        .join(".local")
+        .join("go")
+        .join("bin")
+        .join("go")
+        .is_file()
+        || which("go")
+    {
+        return;
+    }
+    note("Instalando Go (binario oficial)...");
+    let a = if arch.is_x86() { "amd64" } else { "arm64" };
+    let Some(ver) = go_latest_version() else {
+        note("no se pudo resolver version de Go (continuo)");
+        return;
+    };
+    let Ok(tmp) = tmpdir() else { return };
+    let url = format!("https://go.dev/dl/{ver}.linux-{a}.tar.gz");
+    let tar = tmp.join("go.tar.gz");
+    let go_dir = e.home.join(".local").join("go");
+    if download(&url, &tar) {
+        let _ = std::fs::create_dir_all(&go_dir);
+        if run_ok(
+            "tar",
+            &[
+                "-xf",
+                tar.to_str().unwrap(),
+                "-C",
+                go_dir.to_str().unwrap(),
+                "--strip-components=1",
+            ],
+        ) {
+            note(&format!("Go {ver} instalado en {}", go_dir.display()));
+        }
+    } else {
+        note("no se pudo descargar Go (continuo)");
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+/// Resolve the latest stable Go version tag (e.g. "go1.23.2") from go.dev.
+fn go_latest_version() -> Option<String> {
+    let out = Command::new("curl")
+        .args(["-fsSL", "https://go.dev/dl/?mode=json"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let body = String::from_utf8_lossy(&out.stdout);
+    // First "version":"goX.Y.Z" entry is the latest stable.
+    let idx = body.find("\"version\"")?;
+    let seg = &body[idx..];
+    let colon = seg.find(':')?;
+    let after = &seg[colon..];
+    let a = after.find('"')? + 1;
+    let b = after[a..].find('"')? + a;
+    Some(after[a..b].to_string())
 }
 
 // --- npm LSPs ---------------------------------------------------------------
@@ -1075,7 +1145,7 @@ mod tests {
 
     #[test]
     fn version_key_orders_newest_last() {
-        let mut v = vec![
+        let mut v = [
             "google-cloud-cli-498.0.1-linux-x86_64.tar.gz".to_string(),
             "google-cloud-cli-537.0.0-linux-x86_64.tar.gz".to_string(),
             "google-cloud-cli-500.2.0-linux-x86_64.tar.gz".to_string(),

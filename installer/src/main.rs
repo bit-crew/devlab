@@ -150,6 +150,8 @@ fn ensure_install_path() {
         home.join(".cargo").join("bin"),
         home.join(".local").join("bin"),
         home.join(".local").join("node").join("bin"),
+        home.join(".local").join("go").join("bin"), // Go toolchain
+        home.join("go").join("bin"),                // GOPATH bin (go install)
     ];
     let current = std::env::var_os("PATH").unwrap_or_default();
     let mut paths: Vec<PathBuf> = extra.to_vec();
