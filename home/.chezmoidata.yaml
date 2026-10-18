@@ -1,5 +1,4 @@
 # Datos estaticos disponibles en todas las plantillas chezmoi.
 # Los datos por-maquina (profile, gitName, gitEmail) se preguntan en .chezmoi.toml.tmpl.
-agent:
-  repo: "https://github.com/bit-crew/agent.git"
-  home: ".agent"
+# (Vacio por ahora: el agente ya no se clona desde aqui; lo gestiona el binario
+#  devlab-install via Pi/gentle-ai + prim-skills.)

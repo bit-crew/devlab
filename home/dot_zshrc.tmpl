@@ -1,10 +1,4 @@
 {{/* ~/.zshrc generado por chezmoi. Perfil: {{ .profile }} */}}
-{{- if eq .profile "vps" -}}
-
-# Kiro CLI pre block. Keep at the top of this file.
-[[ -f "${HOME}/.local/share/kiro-cli/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/.local/share/kiro-cli/shell/zshrc.pre.zsh"
-
-{{ end -}}
 # ============================================
 #  zsh - perfil: {{ .profile }}
 # ============================================
@@ -19,7 +13,7 @@ HISTFILE="$HOME/.zsh_history"
 setopt SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_SPACE
 
 # PATH: binarios de usuario y toolchains
-export PATH="$HOME/.local/bin:$HOME/.local/node/bin:$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/.local/bin:$HOME/.local/node/bin:$HOME/.cargo/bin:$HOME/go/bin:$PATH"
 
 # rustup / cargo
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
@@ -43,18 +37,3 @@ command -v starship >/dev/null && eval "$(starship init zsh)"
 command -v zoxide   >/dev/null && eval "$(zoxide init zsh)"
 command -v atuin    >/dev/null && eval "$(atuin init zsh)"
 command -v direnv   >/dev/null && eval "$(direnv hook zsh)"
-
-{{- if eq .profile "vps" }}
-
-# --- Solo VPS ---
-# Steering para agentes (Kiro, etc.)
-export KIRO_HOME="$HOME/{{ .agent.home }}"
-
-# Mantener el repo de steering actualizado en background (no bloquea el prompt)
-if [ -d "$KIRO_HOME/.git" ]; then
-  git -C "$KIRO_HOME" pull --ff-only --quiet 2>/dev/null &!
-fi
-
-# Kiro CLI post block. Keep at the bottom of this file.
-[[ -f "${HOME}/.local/share/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/.local/share/kiro-cli/shell/zshrc.post.zsh"
-{{- end }}

@@ -94,9 +94,48 @@ fn run() -> io::Result<()> {
     }
     ensure_chezmoi()?;
     apply_dotfiles(profile)?;
+    set_login_shell_zsh();
 
     log("Instalacion completa.");
     Ok(())
+}
+
+/// Set the user's login shell to zsh so the devlab environment (PATH, prompt,
+/// integrations configured in ~/.zshrc) loads on every login without a manual
+/// `chsh`. No-op if zsh is missing or already the login shell. Tries sudo first
+/// (passwordless on a typical VPS); falls back to plain `chsh`, which may prompt
+/// for the password once. Non-fatal: a failure only means the user keeps their
+/// current shell and can run `zsh` by hand.
+fn set_login_shell_zsh() {
+    let Some(zsh) = which_path("zsh") else {
+        log("zsh no encontrado; no se cambia el shell de login.");
+        return;
+    };
+    let zsh = zsh.to_string_lossy().to_string();
+
+    // Already the login shell? (SHELL reflects the login shell in practice.)
+    if std::env::var("SHELL").map(|s| s == zsh).unwrap_or(false) {
+        return;
+    }
+
+    log(&format!("Configurando zsh como shell de login ({zsh})..."));
+    let user = std::env::var("USER").unwrap_or_default();
+    let sudo_ok = !user.is_empty()
+        && Command::new("sudo")
+            .args(["-n", "chsh", "-s", &zsh, &user])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+    if sudo_ok {
+        log("Shell de login = zsh (via sudo). Reconecta para que tome efecto.");
+        return;
+    }
+    // Fallback: plain chsh (may prompt for the password once).
+    if run_cmd("chsh", &["-s", &zsh]).is_ok() {
+        log("Shell de login = zsh. Reconecta para que tome efecto.");
+    } else {
+        log("No se pudo cambiar el shell de login (continuo). Ejecuta 'zsh' manualmente o 'chsh -s $(which zsh)'.");
+    }
 }
 
 // --- profile + paths --------------------------------------------------------
