@@ -95,17 +95,23 @@ pub fn install_all(profile: Profile) -> io::Result<()> {
 // --- download / extract helpers ---------------------------------------------
 
 /// Download `url` to `dest` with curl. Returns false on failure (non-fatal).
+/// Forces IPv4 (`-4`): some hosts (e.g. dl.google.com for the Go tarball)
+/// resolve to IPv6, and a VPS with broken/unrouted IPv6 would hang or fail.
 fn download(url: &str, dest: &Path) -> bool {
     Command::new("curl")
-        .args(["-fsSL", url, "-o", dest.to_str().unwrap()])
+        .args(["-4", "-fsSL", url, "-o", dest.to_str().unwrap()])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
 }
 
 /// Fetch a URL's body as text (for piping installer scripts into sh).
+/// Forces IPv4 for the same reason as `download` (hosts with broken IPv6).
 fn curl_text(url: &str) -> Option<String> {
-    let out = Command::new("curl").args(["-fsSL", url]).output().ok()?;
+    let out = Command::new("curl")
+        .args(["-4", "-fsSL", url])
+        .output()
+        .ok()?;
     if out.status.success() {
         Some(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
@@ -147,7 +153,10 @@ fn pipe_to(program: &str, script: &str, args: &[&str]) -> bool {
 /// numeric version (no leading v). None on failure.
 fn latest_github_version(repo: &str) -> Option<String> {
     let url = format!("https://api.github.com/repos/{repo}/releases/latest");
-    let out = Command::new("curl").args(["-fsSL", &url]).output().ok()?;
+    let out = Command::new("curl")
+        .args(["-4", "-fsSL", &url])
+        .output()
+        .ok()?;
     if !out.status.success() {
         return None;
     }
@@ -540,7 +549,7 @@ fn install_node(e: &Env, arch: Arch) {
 /// Resolve the latest Node version string (vX.Y.Z) from the dist index.
 fn node_latest_version() -> Option<String> {
     let out = Command::new("curl")
-        .args(["-fsSL", "https://nodejs.org/dist/index.json"])
+        .args(["-4", "-fsSL", "https://nodejs.org/dist/index.json"])
         .output()
         .ok()?;
     if !out.status.success() {
@@ -615,7 +624,7 @@ fn install_go(e: &Env, arch: Arch) {
 /// robust than parsing the JSON index.
 fn go_latest_version() -> Option<String> {
     let out = Command::new("curl")
-        .args(["-fsSL", "https://go.dev/VERSION?m=text"])
+        .args(["-4", "-fsSL", "https://go.dev/VERSION?m=text"])
         .output()
         .ok()?;
     if !out.status.success() {
