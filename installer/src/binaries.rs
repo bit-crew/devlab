@@ -588,6 +588,9 @@ fn install_go(e: &Env, arch: Arch) {
     let tar = tmp.join("go.tar.gz");
     let go_dir = e.home.join(".local").join("go");
     if download(&url, &tar) {
+        // Never untar over an existing tree (official docs: that produces a
+        // broken install). Remove the previous dir first, then recreate.
+        let _ = std::fs::remove_dir_all(&go_dir);
         let _ = std::fs::create_dir_all(&go_dir);
         if run_ok(
             "tar",
@@ -607,24 +610,24 @@ fn install_go(e: &Env, arch: Arch) {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
-/// Resolve the latest stable Go version tag (e.g. "go1.23.2") from go.dev.
+/// Resolve the latest stable Go version tag (e.g. "go1.27.2"). Uses the
+/// official plain-text endpoint (first line is the version), which is far more
+/// robust than parsing the JSON index.
 fn go_latest_version() -> Option<String> {
     let out = Command::new("curl")
-        .args(["-fsSL", "https://go.dev/dl/?mode=json"])
+        .args(["-fsSL", "https://go.dev/VERSION?m=text"])
         .output()
         .ok()?;
     if !out.status.success() {
         return None;
     }
     let body = String::from_utf8_lossy(&out.stdout);
-    // First "version":"goX.Y.Z" entry is the latest stable.
-    let idx = body.find("\"version\"")?;
-    let seg = &body[idx..];
-    let colon = seg.find(':')?;
-    let after = &seg[colon..];
-    let a = after.find('"')? + 1;
-    let b = after[a..].find('"')? + a;
-    Some(after[a..b].to_string())
+    let first = body.lines().next()?.trim();
+    if first.starts_with("go") {
+        Some(first.to_string())
+    } else {
+        None
+    }
 }
 
 // --- npm LSPs ---------------------------------------------------------------
