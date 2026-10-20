@@ -48,8 +48,9 @@ ask() {
 
 # ---------------------------------------------------------------------------
 # Mapea uname -s/-m al sufijo del asset publicado por el CI.
-# Hoy el CI solo compila x86_64-linux; otros objetivos (Android/arm) se
-# agregaran cuando el workflow los produzca.
+# El CI compila: x86_64-linux (glibc) y aarch64-linux (musl estatico). El
+# binario aarch64 es estatico, asi que corre en Linux ARM y en Android/Termux
+# (que usa bionic libc). Termux reporta uname -s = Linux.
 # ---------------------------------------------------------------------------
 asset_suffix() {
     _os="$(uname -s)"
@@ -59,8 +60,9 @@ asset_suffix() {
         *) err "SO no soportado todavia: $_os (por ahora solo Linux)."; return 1 ;;
     esac
     case "$_arch" in
-        x86_64|amd64) echo "x86_64-linux" ;;
-        *) err "Arquitectura no soportada todavia: $_arch (por ahora solo x86_64)."; return 1 ;;
+        x86_64|amd64)  echo "x86_64-linux" ;;
+        aarch64|arm64) echo "aarch64-linux" ;;
+        *) err "Arquitectura no soportada: $_arch (soportadas: x86_64, aarch64)."; return 1 ;;
     esac
 }
 
@@ -81,10 +83,10 @@ install_local() {
     _bin="${_tmp}/devlab-install"
 
     log "Descargando devlab-install (${_suffix})..."
-    curl -fsSL -o "$_bin" "$_bin_url" || { err "no se pudo descargar el binario."; exit 1; }
+    curl -4 -fsSL -o "$_bin" "$_bin_url" || { err "no se pudo descargar el binario."; exit 1; }
 
     # Verificacion de integridad (no fatal si no hay sha256sum/shasum).
-    if curl -fsSL -o "${_tmp}/sum" "$_sum_url" 2>/dev/null; then
+    if curl -4 -fsSL -o "${_tmp}/sum" "$_sum_url" 2>/dev/null; then
         _expected="$(awk '{print $1}' "${_tmp}/sum")"
         if command -v sha256sum >/dev/null 2>&1; then
             _actual="$(sha256sum "$_bin" | awk '{print $1}')"
@@ -134,7 +136,7 @@ install_vps_remote() {
             sudo apt-get update -y &&
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl;
         fi &&
-        curl -fsSL ${RAW_URL} | DEVLAB_ROLE=vps-local sh
+        curl -4 -fsSL ${RAW_URL} | DEVLAB_ROLE=vps-local sh
     "
 
     log "VPS configurado con el entorno devlab."
