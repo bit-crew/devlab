@@ -1,9 +1,15 @@
 name: build-installer
 
 # Compiles the devlab-install Rust binary on GitHub's runners (not on the VPS)
-# and publishes it as a "latest" prerelease with a sha256 checksum, so any host
+# and publishes it as a "latest" prerelease with sha256 checksums, so any host
 # can download the prebuilt binary instead of compiling it. Mirrors how gentle-ai
 # ships (CI builds -> GitHub Releases -> curl installer downloads).
+#
+# Two targets:
+#   - x86_64-unknown-linux-gnu   : the VPS and desktop Linux.
+#   - aarch64-unknown-linux-musl : ARM64. musl is statically linked, so the same
+#     binary runs on normal ARM Linux AND on Android/Termux (which uses bionic
+#     libc, not glibc; a glibc ARM binary would not run there).
 
 on:
   push:
@@ -18,25 +24,53 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset: devlab-install-x86_64-linux
+            apt_musl: ""
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            asset: devlab-install-aarch64-linux
+            apt_musl: "musl-tools"
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         working-directory: installer
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust (stable)
-        run: rustup toolchain install stable --profile minimal
+      - name: Install Rust (stable) + target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add ${{ matrix.target }}
 
-      - name: Build release (x86_64-unknown-linux-gnu)
-        run: cargo build --release
+      - name: Install musl tools (ARM target)
+        if: matrix.apt_musl != ''
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_musl }}
+
+      - name: Build release (${{ matrix.target }})
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Smoke test (binary runs on this arch)
+        run: |
+          BIN="$(pwd)/target/${{ matrix.target }}/release/devlab-install"
+          # Run `verify` from an empty temp dir: no build system is detected
+          # there, so it exits 0 cleanly. This only proves the binary executes
+          # on the build architecture (esp. the aarch64 musl static binary).
+          tmp="$(mktemp -d)"
+          ( cd "$tmp" && "$BIN" verify )
 
       - name: Stage artifact + checksum
-        working-directory: installer/target/release
+        working-directory: installer
         run: |
-          cp devlab-install devlab-install-x86_64-linux
-          sha256sum devlab-install-x86_64-linux > devlab-install-x86_64-linux.sha256
-          cat devlab-install-x86_64-linux.sha256
+          OUT="target/${{ matrix.target }}/release/devlab-install"
+          cp "$OUT" "${{ matrix.asset }}"
+          sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          cat "${{ matrix.asset }}.sha256"
 
       - name: Publish "latest" prerelease
         uses: softprops/action-gh-release@v2
@@ -45,5 +79,5 @@ jobs:
           name: devlab-install (latest build)
           prerelease: true
           files: |
-            installer/target/release/devlab-install-x86_64-linux
-            installer/target/release/devlab-install-x86_64-linux.sha256
+            installer/${{ matrix.asset }}
+            installer/${{ matrix.asset }}.sha256
