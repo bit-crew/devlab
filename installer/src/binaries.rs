@@ -74,6 +74,7 @@ pub fn install_all(profile: Profile) -> io::Result<()> {
     install_marksman(&e, arch);
     install_node(&e, arch);
     install_go(&e, arch);
+    install_lazysql();
     install_npm_lsps(&e);
     install_uv_tools();
     install_yazi(&e, arch);
@@ -636,6 +637,32 @@ fn go_latest_version() -> Option<String> {
         Some(first.to_string())
     } else {
         None
+    }
+}
+
+// --- lazysql (DB TUI) -------------------------------------------------------
+
+/// lazysql: a TUI database client (PostgreSQL, MySQL, SQLite, ...). Installed
+/// with `go install` into ~/go/bin (already on PATH), so it depends on Go
+/// having been installed just above. Both profiles. No BigQuery (lazysql speaks
+/// the Postgres/MySQL wire protocol; BigQuery would need a separate tool).
+fn install_lazysql() {
+    if which("lazysql") {
+        return;
+    }
+    // Resolve the `go` we installed under ~/.local/go, else fall back to PATH.
+    let go = dirs::home_dir()
+        .map(|h| h.join(".local").join("go").join("bin").join("go"))
+        .filter(|p| p.is_file())
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "go".to_string());
+    if !which("go") && go == "go" {
+        note("Go no disponible; se omite lazysql (continuo)");
+        return;
+    }
+    note("Instalando lazysql (go install)...");
+    if !run_ok(&go, &["install", "github.com/jorgerojas26/lazysql@latest"]) {
+        note("fallo go install lazysql (continuo)");
     }
 }
 
