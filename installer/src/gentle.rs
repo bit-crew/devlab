@@ -1,23 +1,20 @@
 //! Phase 2c: curate gentle/Pi after installing it (Option A — by files).
 //!
-//! The content (skills + instructions + manifest) is NOT vendored here: it
-//! lives in the standalone `bit-crew/prim-skills` repo so any agent can reuse
-//! it. This module clones that repo to a temp dir, curates it into the Pi /
-//! gentle-ai install, then removes the clone so no content lingers on the VPS.
+//! devlab owns the environment and the agent (gentle-ai + Pi). Skills are
+//! universal content, owned by the `bit-crew/prim-skills` repo and installed by
+//! its own binary `prim-skills-install` — devlab does NOT copy skills anymore;
+//! it delegates to that installer.
 //!
-//! Curation on top of what gentle-ai already provisions:
-//!   - install OUR skills into Pi's user skills dir (~/.pi/agent/skills),
-//!   - concatenate OUR instructions into Pi's AGENTS.md,
-//!   - remove only hermes-ephemeral-delegation (not our agent),
+//! What devlab still curates here (specific to devlab, not universal skills):
+//!   - concatenate OUR instructions into Pi's AGENTS.md (steering),
 //!   - keep Engram LOCAL only (no Engram Cloud),
-//!   - refresh the skill registry so Pi sees the curated set.
+//!   - refresh the skill registry.
 //!
-//! Pi's user skill scan roots are defined by gentle-pi's skill-registry; the
-//! canonical one for Pi is ~/.pi/agent/skills (verified against gentle-pi).
+//! The instructions live in prim-skills (cloned to a temp dir for this), but the
+//! act of injecting them into Pi's AGENTS.md is devlab's own steering.
 //!
 //! Non-fatal: logs and continues, so a partial install does not abort.
 
-use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -28,16 +25,8 @@ fn note(msg: &str) {
     println!("{BLUE}[gentle]{RESET} {msg}");
 }
 
-/// Content repo cloned at install time (content only, agent-agnostic).
+/// Content repo cloned at install time (for the instructions / steering).
 const SKILLS_REPO: &str = "https://github.com/bit-crew/prim-skills.git";
-
-/// Skills removed after gentle installs (only ones that don't apply to us).
-const SKILLS_TO_REMOVE: &[&str] = &["hermes-ephemeral-delegation"];
-
-/// Pi's user skills directory (the canonical scan root for the Pi agent).
-fn pi_skills_dir(home: &Path) -> PathBuf {
-    home.join(".pi").join("agent").join("skills")
-}
 
 /// Pi's agent config dir, where AGENTS.md lives.
 fn pi_agent_dir(home: &Path) -> PathBuf {
@@ -51,20 +40,38 @@ pub fn curate() {
         return;
     };
 
-    // Clone the content repo to a temp dir; remove it at the end.
-    let Some(content) = clone_content() else {
-        note("no se pudo clonar prim-skills; se omite la curaduria.");
-        return;
-    };
+    // Skills are installed by prim-skills' own binary (unified in ~/.agents/skills).
+    install_skills_via_prim();
 
-    install_our_skills(&content, &pi_skills_dir(&home));
-    append_our_instructions(&content, &pi_agent_dir(&home));
-    remove_unwanted_skills(&pi_skills_dir(&home));
+    // Clone the content repo to a temp dir for the instructions (steering).
+    if let Some(content) = clone_content() {
+        append_our_instructions(&content, &pi_agent_dir(&home));
+        let _ = std::fs::remove_dir_all(&content);
+    } else {
+        note("no se pudo clonar prim-skills para instrucciones (continuo).");
+    }
+
     ensure_engram_local();
     refresh_index();
 
-    let _ = std::fs::remove_dir_all(&content);
-    note("Curaduria de Pi/gentle completa (clon de prim-skills eliminado).");
+    note("Curaduria de Pi/gentle completa.");
+}
+
+/// Delegate skill installation to prim-skills-install (own + external skills,
+/// unified in ~/.agents/skills). Downloads and runs its bootstrap; non-fatal.
+fn install_skills_via_prim() {
+    note("Instalando skills via prim-skills-install...");
+    let Some(script) =
+        curl_text("https://raw.githubusercontent.com/bit-crew/prim-skills/main/install.sh")
+    else {
+        note("no se pudo descargar install.sh de prim-skills (continuo)");
+        return;
+    };
+    if sh_stdin(&script, &[]) {
+        note("Skills instaladas via prim-skills.");
+    } else {
+        note("fallo prim-skills-install (continuo)");
+    }
 }
 
 /// Clone prim-skills into a fresh temp dir. Returns the clone path on success.
@@ -83,33 +90,6 @@ fn clone_content() -> Option<PathBuf> {
     } else {
         None
     }
-}
-
-/// Copy content/skills/* into Pi's user skills dir.
-fn install_our_skills(content: &Path, dst_root: &Path) {
-    let from_root = content.join("skills");
-    let Ok(entries) = std::fs::read_dir(&from_root) else {
-        note(&format!(
-            "no se pudieron leer skills en {}",
-            from_root.display()
-        ));
-        return;
-    };
-    let _ = std::fs::create_dir_all(dst_root);
-    let mut n = 0;
-    for entry in entries.filter_map(|e| e.ok()) {
-        let p = entry.path();
-        if p.is_dir() {
-            let dst = dst_root.join(entry.file_name());
-            if copy_dir(&p, &dst).is_ok() {
-                n += 1;
-            }
-        }
-    }
-    note(&format!(
-        "{n} skills propias instaladas en {}",
-        dst_root.display()
-    ));
 }
 
 /// Append our always-on instructions to Pi's AGENTS.md. Strips the YAML
@@ -155,16 +135,6 @@ const ODD_MEMORY_STEPS: &str = "\
    decisions, conventions and bugs, so context accumulates across sessions\n\
    instead of resetting. After significant work, save the decision or learning.\n\n";
 
-/// Remove skills that don't apply to our agent (only hermes).
-fn remove_unwanted_skills(skills_dir: &Path) {
-    for name in SKILLS_TO_REMOVE {
-        let dir = skills_dir.join(name);
-        if dir.exists() && std::fs::remove_dir_all(&dir).is_ok() {
-            note(&format!("skill '{name}' eliminada."));
-        }
-    }
-}
-
 /// Keep Engram LOCAL only. We deliberately do NOT set ENGRAM_CLOUD_* or enable
 /// autosync; local is Engram's default. This is an intent assertion.
 fn ensure_engram_local() {
@@ -200,19 +170,34 @@ fn strip_frontmatter(s: &str) -> String {
 }
 
 /// Recursively copy a directory tree.
-fn copy_dir(from: &Path, to: &Path) -> io::Result<()> {
-    std::fs::create_dir_all(to)?;
-    for entry in std::fs::read_dir(from)? {
-        let entry = entry?;
-        let src = entry.path();
-        let dst = to.join(entry.file_name());
-        if src.is_dir() {
-            copy_dir(&src, &dst)?;
-        } else {
-            std::fs::copy(&src, &dst)?;
-        }
+/// Fetch a URL's body as text (install.sh of prim-skills). IPv4 forced to avoid
+/// hanging on hosts with broken IPv6 (same issue hit for Go downloads).
+fn curl_text(url: &str) -> Option<String> {
+    let out = Command::new("curl")
+        .args(["-4", "-fsSL", url])
+        .output()
+        .ok()?;
+    if out.status.success() {
+        Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        None
     }
-    Ok(())
+}
+
+/// Run `sh` feeding `script` on stdin. Returns success as bool.
+fn sh_stdin(script: &str, args: &[&str]) -> bool {
+    use std::io::Write as _;
+    use std::process::Stdio;
+    let child = Command::new("sh").args(args).stdin(Stdio::piped()).spawn();
+    match child {
+        Ok(mut c) => {
+            if let Some(mut stdin) = c.stdin.take() {
+                let _ = stdin.write_all(script.as_bytes());
+            }
+            c.wait().map(|s| s.success()).unwrap_or(false)
+        }
+        Err(_) => false,
+    }
 }
 
 #[cfg(test)]
