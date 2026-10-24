@@ -25,4 +25,27 @@ blue = "{{ .palette.blue }}"
 
 [ui.toast]
 delivery = "herdr"
+
+# Atajos para abrir herramientas en popup (prefix = ctrl+b, luego la tecla).
+# popup = terminal modal que se cierra al salir del programa, sin tocar el layout.
+[[keys.command]]
+key = "prefix+plus"
+type = "popup"
+command = "lazygit"
+width = "90%"
+height = "90%"
+
+[[keys.command]]
+key = "prefix+a"
+type = "popup"
+command = "hx ."
+width = "90%"
+height = "90%"
+
+[[keys.command]]
+key = "prefix+d"
+type = "popup"
+command = "lazysql"
+width = "90%"
+height = "90%"
 {{- end }}
