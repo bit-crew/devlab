@@ -84,8 +84,8 @@ agentes de IA y a ratón/móvil). En el perfil VPS:
 - El `.zshrc` hace `exec herdr` en toda sesión interactiva (SSH, consola, móvil),
   salvo que ya estés dentro de herdr. Así el entorno es idéntico desde cualquier
   cliente.
-- Trae un **tema zenbones "dark warm"** (gris cálido + texto hueso + acentos
-  tostados) definido en una **paleta central** (ver abajo).
+- Trae un **tema propio "gris carbón cálido"** (fondo carbón + texto crudo +
+  acentos terracota/ocre/malva) definido en una **paleta central** (ver abajo).
 - Atajos para abrir herramientas en popup (prefijo `Ctrl+b`, luego la tecla):
   `prefix+plus` → lazygit, `prefix+a` → helix, `prefix+d` → lazysql.
 - Aliases: `hx` (helix), `lg` (lazygit), `db` (lazysql).
@@ -101,14 +101,34 @@ binario habilita el servidor SSH y el linger automáticamente en el perfil VPS.
 
 ## Tema del entorno: paleta central
 
-Una sola fuente de color configura todo el ambiente. En
-`home/.chezmoidata.yaml`, el bloque `palette:` define ~12 colores (zenbones dark
-warm). Cada plantilla los consume vía `{{ .palette.<clave> }}`:
+Una sola fuente de color configura todo el ambiente: el bloque `palette:` en
+**`home/.chezmoidata.yaml`**. Cada plantilla lo consume vía `{{ .palette.<clave> }}`
+— herdr (`[theme.custom]`), Helix (tema `zenbones_warm`), lazygit (bordes/selección).
+Cambiar un color ahí reconfigura las tres a la vez. Aplica al perfil `vps`.
 
-- herdr (`[theme.custom]`), Helix (tema `zenbones_warm`), lazygit (bordes/selección).
+Colores elegidos (editar/eliminar en `.chezmoidata.yaml`, no aquí — esto es solo
+la referencia de qué hace cada uno y quién lo usa):
 
-Cambiar un color en `.chezmoidata.yaml` reconfigura herdr, Helix y lazygit a la
-vez. El tema aplica al perfil `vps`.
+| Clave | Color | Rol | Usado por |
+|-------|-------|-----|-----------|
+| `bg`      | `#31312F` gris carbón cálido | fondo de paneles | herdr `panel_bg`, Helix `ui.background` |
+| `bg_dim`  | `#292927` carbón más oscuro | sidebar, statusline, gutter | herdr `sidebar_bg`, Helix statusline/gutter |
+| `bg_sel`  | `#3C3C39` carbón más claro | selección, fila activa, línea actual | herdr `active_row_bg`/`selection_bg`, Helix/lazygit selección |
+| `fg`      | `#F6F1EA` crudo cálido | texto principal | herdr `text`, Helix `ui.text` |
+| `fg_dim`  | `#A8A39B` crudo apagado | comentarios, texto sutil | Helix `comment`/virtual, lazygit borde inactivo |
+| `orange`  | `#B45A3C` terracota | acento principal | herdr `accent`, Helix keywords, lazygit borde activo |
+| `yellow`  | `#C5A44D` ocre | acento secundario | herdr `yellow`, Helix tipos/strings |
+| `purple`  | `#9580B5` malva | acento terciario | Helix keywords/builtin |
+| `green`   | `#777C45` oliva | sintaxis/diff | herdr `green`, Helix strings, lazygit |
+| `blue`    | `#638A7D` azul-verdoso | sintaxis/diff | herdr `blue`, Helix tags/links |
+| `cyan`    | `#91A99A` verde-gris claro | sintaxis | Helix escapes/special |
+| `red`     | `#8F4935` óxido (terracota oscuro) | errores/diff | herdr `red`, Helix errores, lazygit |
+
+Nota: `bg`/`bg_dim`/`bg_sel`/`fg`/`fg_dim` + `orange` son el ~90% de lo que se
+ve (toda la UI de herdr y lazygit). `yellow`/`purple`/`green`/`blue`/`cyan`/`red`
+existen sobre todo para el resaltado de sintaxis en Helix; si se busca un look
+más minimalista (estilo zenbones, resaltado por contraste y no por color), estos
+últimos son los candidatos a recortar.
 
 ---
 
