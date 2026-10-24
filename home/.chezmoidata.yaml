@@ -2,21 +2,20 @@
 # Los datos por-maquina (profile, gitName, gitEmail) se preguntan en .chezmoi.toml.tmpl.
 
 # ---------------------------------------------------------------------------
-# palette — FUENTE UNICA del tema del ambiente (zenbones "dark warm").
+# palette — FUENTE UNICA del tema del ambiente (gris carbon calido + crudo).
 # Cambia un color aqui y todas las herramientas lo toman: cada plantilla
 # (herdr, helix, lazygit) referencia estos valores via {{ .palette.<key> }}.
-# Base: zenbones_dark (MIT, Michael Chris Lopez) — gris calido + texto hueso.
 # ---------------------------------------------------------------------------
 palette:
-  bg: "#1C1917"      # fondo: gris calido (tinte tierra, no negro)
-  bg_dim: "#211D1B"  # sidebar / statusline / gutter (un pelo mas claro)
-  bg_sel: "#403833"  # seleccion / fila activa / linea actual
-  fg: "#B4BDC3"      # texto hueso / crudo
-  fg_dim: "#8E8E8E"  # comentarios / texto sutil
-  orange: "#D68C67"  # acento principal
-  yellow: "#B77E64"  # amarillo tostado
-  purple: "#B279A7"  # morado
-  red: "#DE6E7C"
-  green: "#819B69"
-  blue: "#6099C0"
-  cyan: "#66A5AD"
+  bg: "#31312F"      # fondo: gris carbon calido
+  bg_dim: "#292927"  # sidebar / statusline / gutter (un escalon mas oscuro)
+  bg_sel: "#3C3C39"  # seleccion / fila activa / linea actual (un escalon mas claro)
+  fg: "#F6F1EA"      # texto crudo calido
+  fg_dim: "#A8A39B"  # comentarios / texto sutil
+  orange: "#B45A3C"  # acento principal: terracota
+  yellow: "#C5A44D"  # amarillo ocre
+  purple: "#9580B5"  # morado malva
+  green: "#777C45"   # verde oliva
+  blue: "#638A7D"    # azul-verdoso frio-calido
+  cyan: "#6E9A8C"    # variante mas clara de blue (para distinguir cyan)
+  red: "#8F4935"     # oxido (terracota oscuro): rojo calido de la paleta
