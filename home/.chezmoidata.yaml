@@ -17,5 +17,5 @@ palette:
   purple: "#9580B5"  # morado malva
   green: "#777C45"   # verde oliva
   blue: "#638A7D"    # azul-verdoso frio-calido
-  cyan: "#6E9A8C"    # variante mas clara de blue (para distinguir cyan)
+  cyan: "#91A99A"    # verde-gris claro (cyan de la paleta)
   red: "#8F4935"     # oxido (terracota oscuro): rojo calido de la paleta
