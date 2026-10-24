@@ -1,0 +1,28 @@
+{{ if eq .profile "vps" -}}
+# ~/.config/herdr/config.toml — generado por chezmoi. Perfil: {{ .profile }}
+# Tema: zenbones "dark warm" (gris calido + texto hueso + acentos tostados).
+# Paleta base: vesper (built-in calido); [theme.custom] la ajusta a zenbones warm.
+
+# Ya elegiste el modo: no vuelvas a mostrar el onboarding.
+onboarding = false
+
+[theme]
+# Base calida con acentos naranja nativos; los tokens de abajo la afinan.
+name = "vesper"
+
+# Override de tokens sobre la base (zenbones dark warm, MIT, Michael Chris Lopez).
+[theme.custom]
+panel_bg = "#1C1917"      # fondo: gris calido (tinte tierra, no negro)
+sidebar_bg = "#211D1B"    # barra lateral un pelo mas clara que el fondo
+active_row_bg = "#403833" # fila/agente activo: gris calido
+selection_bg = "#3D4042"  # cursor en modo Navigate
+text = "#B4BDC3"          # texto hueso / crudo
+accent = "#D68C67"        # acento principal: naranja calido
+yellow = "#B77E64"        # amarillo tostado
+red = "#DE6E7C"
+green = "#819B69"
+blue = "#6099C0"
+
+[ui.toast]
+delivery = "herdr"
+{{- end }}
