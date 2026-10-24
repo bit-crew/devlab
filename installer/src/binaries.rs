@@ -196,28 +196,6 @@ fn chmod_x(path: &Path) {
     let _ = path;
 }
 
-/// Compute a file's sha256 using the system tool (`sha256sum`, else
-/// `shasum -a 256`). Returns the lowercase hex digest. No new crate dependency —
-/// same philosophy as calling curl/tar. None if neither tool is available.
-fn sha256_file(path: &Path) -> Option<String> {
-    let p = path.to_str()?;
-    let out = Command::new("sha256sum")
-        .arg(p)
-        .output()
-        .ok()
-        .filter(|o| o.status.success());
-    let out = match out {
-        Some(o) => o,
-        None => Command::new("shasum")
-            .args(["-a", "256", p])
-            .output()
-            .ok()
-            .filter(|o| o.status.success())?,
-    };
-    let text = String::from_utf8_lossy(&out.stdout);
-    text.split_whitespace().next().map(|s| s.to_lowercase())
-}
-
 /// Run a command, returning success as bool (non-fatal callers).
 fn run_ok(program: &str, args: &[&str]) -> bool {
     Command::new(program)
@@ -803,7 +781,7 @@ fn install_vps_infra(e: &Env, arch: Arch) {
     install_pi();
     install_gentle(e, arch);
     configure_pi_settings(e);
-    install_moshi(e, arch);
+    install_moshi();
     configure_vps_services();
 }
 
@@ -836,101 +814,51 @@ fn try_sudo(args: &[&str]) -> bool {
 
 /// moshi-hook: the server-side daemon of Moshi (getmoshi.app) — bridges AI
 /// coding agents on the VPS to the Moshi mobile app (approve prompts from the
-/// phone's lock screen, see agent state, jump to the exact Herdr tab). Pairs
-/// with Herdr (already installed). VPS-only — it steers the server's agents.
+/// phone's lock screen, see agent state, jump to the exact Herdr/tmux tab).
+/// VPS-only. It is a Go binary (no Bun/Node), installed with Moshi's official
+/// install script — same `curl | sh` pattern as Herdr/Pi/gentle-ai, and always
+/// the latest version (no pinned tarball to maintain).
 ///
-/// Installed from the official release tarball (cdn.getmoshi.app), same pattern
-/// as other binaries — NOT via Homebrew (the VPS has no brew; brew is only the
-/// packager, the tarball is the real artifact). Version is pinned with its
-/// sha256 (deterministic; bump manually on upgrade).
-///
-/// Pairing (`moshi-hook pair --token ...`) and starting the daemon are manual:
-/// the token comes from the Moshi app on the phone (interactive). A systemd
-/// user service is written so the daemon persists across reboots once paired.
-fn install_moshi(e: &Env, arch: Arch) {
+/// Pairing (`moshi-hook pair --token ...`, token from the phone app) and
+/// starting the daemon are manual/interactive. A systemd user service is written
+/// so the daemon persists across reboots once paired (linger is enabled in
+/// configure_vps_services).
+fn install_moshi() {
     if which("moshi-hook") {
         return;
     }
-    const VER: &str = "0.4.37";
-    let (label, sha) = if arch.is_x86() {
-        (
-            "Linux_x86_64",
-            "c401ba0adeaa46d38558ff862a584c824d32e64dc8d79d44daa53e81a6aab4af",
-        )
-    } else {
-        (
-            "Linux_arm64",
-            "58a62cc524373b72b89226a471893bc7f176bb4b09ae66c96487c7106d39f6bb",
-        )
+    note("Instalando moshi-hook (install.sh oficial)...");
+    let Some(script) = curl_text("https://getmoshi.app/install.sh") else {
+        note("no se pudo descargar install.sh de Moshi (continuo)");
+        return;
     };
-    note(&format!("Instalando moshi-hook v{VER} ({label})..."));
-    let Ok(tmp) = tmpdir() else { return };
-    let url = format!("https://cdn.getmoshi.app/hook/v{VER}/moshi-hook_{label}.tar.gz");
-    let tar = tmp.join("moshi.tar.gz");
-    if !download(&url, &tar) {
-        note("no se pudo descargar moshi-hook (continuo)");
-        let _ = std::fs::remove_dir_all(&tmp);
-        return;
-    }
-    // Verify checksum (the tarball has no signature; sha256 is our integrity gate).
-    if let Some(actual) = sha256_file(&tar) {
-        if actual != sha {
-            note("checksum de moshi-hook no coincide; se omite (continuo)");
-            let _ = std::fs::remove_dir_all(&tmp);
-            return;
-        }
+    if sh_stdin(&script, &[]) {
+        note("moshi-hook instalado.");
+        write_moshi_service();
+        note("Pareo pendiente (manual): 'moshi-hook pair --token <token de la app>', 'moshi-hook install', y 'systemctl --user start moshi-hook'.");
     } else {
-        note("no se pudo calcular sha256 de moshi-hook; se omite por seguridad (continuo)");
-        let _ = std::fs::remove_dir_all(&tmp);
-        return;
+        note("fallo instalacion de moshi-hook (continuo)");
     }
-    if !run_ok(
-        "tar",
-        &["-xf", tar.to_str().unwrap(), "-C", tmp.to_str().unwrap()],
-    ) {
-        note("no se pudo extraer moshi-hook (continuo)");
-        let _ = std::fs::remove_dir_all(&tmp);
-        return;
-    }
-    let bin = e.local_bin.join("moshi-hook");
-    if std::fs::copy(tmp.join("moshi-hook"), &bin).is_ok() {
-        chmod_x(&bin);
-        // The formula symlinks `moshi` -> `moshi-hook`; mirror that.
-        let moshi = e.local_bin.join("moshi");
-        let _ = std::fs::remove_file(&moshi);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::symlink;
-            let _ = symlink("moshi-hook", &moshi);
-        }
-        note("moshi-hook instalado en ~/.local/bin (symlink moshi).");
-        write_moshi_service(e);
-        note("Pareo pendiente (manual): 'moshi-hook pair --token <token de la app>' y luego 'systemctl --user start moshi-hook'.");
-    } else {
-        note("no se pudo instalar moshi-hook (continuo)");
-    }
-    let _ = std::fs::remove_dir_all(&tmp);
 }
 
 /// Write a systemd *user* service so the moshi-hook daemon persists across
 /// reboots once paired. Not enabled/started here (pairing is manual first).
-fn write_moshi_service(e: &Env) {
-    let dir = e.home.join(".config").join("systemd").join("user");
+fn write_moshi_service() {
+    let Some(home) = dirs::home_dir() else { return };
+    let dir = home.join(".config").join("systemd").join("user");
     if std::fs::create_dir_all(&dir).is_err() {
         return;
     }
-    let bin = e.local_bin.join("moshi-hook");
-    let unit = format!(
-        "[Unit]\n\
+    // moshi-hook lands on PATH via the installer; reference it by name so the
+    // service works wherever the installer placed it.
+    let unit = "[Unit]\n\
          Description=moshi-hook daemon (Moshi mobile bridge)\n\
          After=network-online.target\n\n\
          [Service]\n\
-         ExecStart={} serve\n\
+         ExecStart=%h/.local/bin/moshi-hook serve\n\
          Restart=on-failure\n\n\
          [Install]\n\
-         WantedBy=default.target\n",
-        bin.display()
-    );
+         WantedBy=default.target\n";
     if std::fs::write(dir.join("moshi-hook.service"), unit).is_ok() {
         note("systemd user service escrito (~/.config/systemd/user/moshi-hook.service).");
     }
