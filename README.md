@@ -2,23 +2,30 @@
 
 Estación de trabajo de desarrollo reproducible, desplegable con un solo comando.
 
-Entorno para Data Engineering (Polars, DuckDB, PySpark para tests, AWS), edición
-modal (Helix) y multiplexado de terminal (Zellij), sobre **Debian 13**.
+Entorno para Data Engineering (Polars, DuckDB, PySpark para tests, AWS/GCP),
+edición modal (Helix) y un multiplexor consciente de agentes (**herdr**), sobre
+**Debian 13**.
 
 Sin Nix. La gestión es:
 
 - **apt** — paquetes del sistema (Debian).
 - **rustup** — toolchain de Rust (Rust, rust-analyzer).
 - **uv** — Python por proyecto (`uv.lock`, `.venv`), no a nivel de sistema.
+- **go** — toolchain de Go (para binarios como lazysql).
 - **chezmoi** — dotfiles y configuración con plantillas por perfil.
 - **Cloudflare R2** — datos persistentes.
+
+El entorno es idéntico mires desde donde mires: en el VPS, el **terminal por
+defecto es herdr** (toda sesión interactiva entra o se adjunta a él), así que al
+conectarte por SSH o desde el móvil obtienes la misma distribución, atajos,
+editor y tema sin configurar cada dispositivo.
 
 ---
 
 ## Despliegue con un solo comando
 
 Punto de entrada único para ambos roles (tu máquina cliente o un VPS remoto).
-Desde cualquier dispositivo Linux (incluido Android/Termux, arm64 — próximamente):
+Desde cualquier dispositivo Linux (x86_64 o aarch64, incluido Android/Termux):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bit-crew/devlab/main/install.sh | sh
@@ -28,25 +35,22 @@ curl -fsSL https://raw.githubusercontent.com/bit-crew/devlab/main/install.sh | s
 GitHub Actions en la release `latest`), verifica su checksum y lo ejecuta. Toda
 la lógica de instalación vive en ese binario Rust.
 
-Primero pregunta qué configurar:
+Modos (también pasables como argumento):
 
-1. **Cliente (este equipo, perfil dc1)** — baja y ejecuta el binario aquí.
-2. **VPS remoto (perfil vps)** — pregunta IP y usuario del VPS, se conecta por
-   SSH (con la password temporal de OVH) y corre `install.sh` allá en modo
-   local con perfil `vps`. Se puede hacer desde cualquier PC; no instala claves
-   SSH.
+- **`vps`** (desde el cliente) — pregunta IP y usuario del VPS, se conecta por
+  SSH y ejecuta la instalación allá con perfil `vps`. No instala claves SSH.
+- **`dc1`** — instala el perfil cliente en este mismo equipo.
 
 No requiere clonar nada ni tener Python: solo `sh` (y `ssh` para el VPS).
-También puedes pasar el rol como argumento: `sh install.sh dc1` o
-`sh install.sh vps`.
 
-Hoy el binario se compila solo para `x86_64-linux`; otros objetivos
-(Android/arm64, macOS, Windows) se añadirán cuando el CI los produzca.
+El CI compila el binario para **x86_64-linux** y **aarch64-linux** (musl
+estático, para ARM/Termux). macOS y Windows se añadirán cuando el CI los
+produzca.
 
-**Modelo de responsabilidades:** configurar el VPS (con IP+usuario+password)
-solo deja el servidor con el entorno instalado. Enlazar un cliente al VPS por
-clave SSH es tarea de la configuración del cliente: cada máquina (tablet,
-laptop) genera su clave y la registra en el VPS.
+**Modelo de responsabilidades:** configurar el VPS deja el servidor con el
+entorno y el agente instalados. Enlazar un cliente al VPS por clave SSH es tarea
+del cliente: cada máquina (tablet, laptop) genera su clave y la registra en el
+VPS.
 
 ---
 
@@ -55,20 +59,70 @@ laptop) genera su clave y la registra en el VPS.
 | Perfil | Descripción | Rol |
 |--------|-------------|-----|
 | `dc1`  | Máquina local (Data Center 1) | Edición offline, se conecta al VPS por SSH |
-| `vps`  | Servidor (OVHcloud, Debian) | Trabajo de datos: Polars/DuckDB, tests, Docker |
+| `vps`  | Servidor (OVHcloud, Debian) | Trabajo de datos, agente always-on, acceso móvil |
 
 Reparto de herramientas (resumen):
 
-- **Ambos:** git, openssh, zsh, curl, jq, helix, herdr, lazygit, yazi, ripgrep,
-  fd, fzf, bat, zoxide, eza, atuin, starship, chezmoi, uv, Python (vía uv),
-  rustup + rust-analyzer.
+- **Ambos:** git, openssh, zsh, curl, jq, helix, **herdr**, lazygit, lazysql,
+  yazi, ripgrep, fd, fzf, bat, zoxide, eza, atuin, starship, direnv, chezmoi,
+  uv, Python (vía uv), rustup + rust-analyzer, go.
 - **Solo VPS:** JDK (PySpark para tests), AWS CLI, Terraform, sops, age,
-  GCP SDK, toolchain C/C++ + clangd, y el agente (Pi + gentle-ai).
+  GCP SDK, toolchain C/C++ + clangd, el agente (**Pi + gentle-ai**), y
+  **moshi-hook** (puente para operar el agente desde el móvil).
 
 Los paquetes del sistema se declaran en `packages/system.txt` (por perfil y
-gestor: apt/pkg/brew); las herramientas en Rust y algunos binarios (helix,
-herdr, lazygit, terraform, aws-cli, sops) los instala el binario
-`devlab-install` desde release/cargo.
+gestor: apt/pkg/brew); las toolchains y binarios los instala `devlab-install`
+desde release/cargo/go.
+
+---
+
+## El terminal: herdr como entorno por defecto (VPS)
+
+herdr es un multiplexor consciente de agentes (como tmux, pero orientado a
+agentes de IA y a ratón/móvil). En el perfil VPS:
+
+- El `.zshrc` hace `exec herdr` en toda sesión interactiva (SSH, consola, móvil),
+  salvo que ya estés dentro de herdr. Así el entorno es idéntico desde cualquier
+  cliente.
+- Trae un **tema zenbones "dark warm"** (gris cálido + texto hueso + acentos
+  tostados) definido en una **paleta central** (ver abajo).
+- Atajos para abrir herramientas en popup (prefijo `Ctrl+b`, luego la tecla):
+  `prefix+plus` → lazygit, `prefix+a` → helix, `prefix+d` → lazysql.
+- Aliases: `hx` (helix), `lg` (lazygit), `db` (lazysql).
+
+### Acceso móvil (Moshi)
+
+En el VPS se instala **moshi-hook**, el puente que permite ver y operar el
+agente (Pi) desde la app Moshi en el teléfono. Corre como servicio systemd de
+usuario con `linger` (sobrevive reinicios sin sesión abierta) y usa SSH/Mosh. El
+binario habilita el servidor SSH y el linger automáticamente en el perfil VPS.
+
+---
+
+## Tema del entorno: paleta central
+
+Una sola fuente de color configura todo el ambiente. En
+`home/.chezmoidata.yaml`, el bloque `palette:` define ~12 colores (zenbones dark
+warm). Cada plantilla los consume vía `{{ .palette.<clave> }}`:
+
+- herdr (`[theme.custom]`), Helix (tema `zenbones_warm`), lazygit (bordes/selección).
+
+Cambiar un color en `.chezmoidata.yaml` reconfigura herdr, Helix y lazygit a la
+vez. El tema aplica al perfil `vps`.
+
+---
+
+## El agente (solo VPS)
+
+Al aplicar el perfil `vps`, el binario instala y configura el agente:
+
+- **Pi + gentle-ai** como agente de trabajo.
+- **Skills:** devlab NO copia skills; las gestiona el repo aparte
+  **[`bit-crew/prim-skills`](https://github.com/bit-crew/prim-skills)**, que
+  instala sus propias skills más externas (Archify, ponytail, ...) en
+  `~/.agents/skills` (raíz que Pi escanea).
+- devlab sí concatena **sus** instructions en el `AGENTS.md` de Pi (steering
+  específico de devlab) y mantiene **Engram local** (sin Engram Cloud).
 
 ---
 
@@ -80,19 +134,20 @@ devlab/
 ├── installer/                # binario Rust devlab-install (toda la logica)
 │   ├── Cargo.toml
 │   └── src/
-├── docs/
-│   └── vps-ovh.md            # compra manual del VPS y flujo de despliegue
+│       ├── main.rs           # orquestacion + chezmoi + dotfiles
+│       ├── binaries.rs       # toolchains, binarios, infra VPS, moshi
+│       └── gentle.rs         # curado del agente Pi (instructions + Engram)
+├── docs/                     # compra del VPS, multi-cuenta, ...
 ├── packages/
 │   ├── system.txt            # paquetes del sistema por perfil y gestor
 │   └── cargo.txt             # componentes rustup + herramientas cargo
 ├── home/                     # source de chezmoi (dotfiles)
 │   ├── .chezmoi.toml.tmpl
-│   ├── .chezmoidata.yaml
-│   ├── dot_gitconfig.tmpl
-│   ├── dot_zshrc.tmpl
-│   └── dot_config/           # helix, lazygit, atuin, ...
-├── content/                  # steering/skills del agente (gentle/Pi)
-├── .github/workflows/        # CI: build del binario + validacion
+│   ├── .chezmoidata.yaml     # paleta central del tema
+│   ├── dot_zshrc.tmpl        # exec herdr, aliases, COLORTERM
+│   └── dot_config/           # herdr, helix (+themes), lazygit, atuin, ...
+├── TODO.md
+├── .github/workflows/        # CI: build del binario (x86_64 + aarch64) + validacion
 └── README.md
 ```
 
@@ -104,8 +159,10 @@ devlab/
 
 1. Instala los paquetes de `packages/system.txt` que aplican al perfil
    (detecta apt/pkg/brew).
-2. Instala toolchains (rustup, uv), binarios (helix, lazygit, ...) y, en el
-   perfil vps, la infra (AWS/Terraform/sops/GCP) y el agente (Pi + gentle-ai).
+2. Instala toolchains (rustup, uv, go), binarios (helix, herdr, lazygit,
+   lazysql, ...) y, en el perfil vps, la infra (AWS/Terraform/sops/GCP), el
+   agente (Pi + gentle-ai, con skills delegadas a prim-skills), moshi-hook, y
+   los servicios de OS que necesita (SSH + linger).
 3. Instala `chezmoi` y aplica los dotfiles de `home/` para el perfil.
 
 Es **idempotente**: cada herramienta se instala solo si falta, así que puedes
@@ -113,7 +170,7 @@ volver a correrlo sin romper nada.
 
 ---
 
-## Python por proyecto (uv)
+## Python por proyecto (uv + direnv)
 
 Python **no** se instala a nivel de sistema. Cada proyecto usa `uv`:
 
@@ -123,6 +180,12 @@ uv init            # crea pyproject.toml
 uv add polars      # añade dependencias -> uv.lock
 uv run python ...  # ejecuta en el .venv del proyecto
 ```
+
+`direnv` complementa a uv: activa el `.venv` al entrar a la carpeta (para que el
+LSP de Helix vea las dependencias) y aísla variables de entorno y credenciales
+cloud por proyecto (p. ej. una cuenta de gcloud por proyecto con
+`CLOUDSDK_ACTIVE_CONFIG_NAME`). Rust (Cargo) y Go (módulos) ya aíslan sus
+dependencias de forma nativa; direnv ahí solo sirve para variables de entorno.
 
 ---
 
@@ -146,18 +209,11 @@ es la fuente de verdad, y por eso el VPS es desechable y reproducible.
 
 ---
 
-## Steering del agente (solo VPS)
-
-Al aplicar el perfil `vps`, `chezmoi` clona el repo de steering del agente en
-`~/.agent` y `~/.zshrc` exporta `KIRO_HOME=$HOME/.agent`. El repo se actualiza en
-background al abrir la shell.
-
----
-
 ## CI
 
-`.github/workflows/build-installer.yml` compila el binario `devlab-install` en
-cada push a `installer/**` y lo publica como prerelease `latest` con su sha256.
+`.github/workflows/build-installer.yml` compila `devlab-install` para
+x86_64-linux y aarch64-linux en cada push a `installer/**` y lo publica como
+prerelease `latest` con su sha256.
 
 `.github/workflows/validate.yml` valida en cada push/PR:
 
