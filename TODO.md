@@ -66,3 +66,30 @@ prueba en tablet real.
 Decidir que subset del entorno tiene sentido en un cliente movil: quizas el
 cliente dc1-tablet solo necesite editor + multiplexer + cliente SSH para
 conectarse al VPS, no todo el stack de Data Engineering.
+
+## Evaluar mosh vs ssh para el cliente (tablet)
+
+Pendiente de decidir si el cliente (tablet) se conecta al VPS via mosh en vez de
+ssh simple. mosh ya esta instalado en el VPS (`system.txt`, lo necesita
+moshi-hook). El telefono ya usa Moshi, que va sobre mosh por debajo.
+
+| Aspecto | ssh simple | mosh |
+|---|---|---|
+| Cambio de red / IP (WiFi <-> datos) | corta la sesion | sobrevive (UDP + session id) |
+| Suspension del dispositivo | sesion congelada/muerta | retoma al instante |
+| Escritura con latencia alta | lag por caracter | local echo, sin lag |
+| Scrollback | del terminal | N/A — lo gestiona herdr, no afecta |
+| Puertos | solo TCP 22 | requiere UDP 60000-61000 abierto |
+| Reenvio de agente/puertos | si | no (no se usa: se trabaja dentro del VPS) |
+
+Inclinacion: mosh es mejor para la tablet (red movil cambiante, suspension) y su
+unico contra real (scrollback) lo cubre herdr. Daria consistencia: telefono y
+tablet usarian el mismo transporte.
+
+### Pendiente antes de adoptarlo
+
+1. Verificar que el firewall del VPS (OVH) permite UDP en el rango de mosh
+   (60000-61000). Si esta cerrado, mosh no conecta.
+2. Si hace falta abrirlo, hacerlo de forma reproducible en el binario
+   (`configure_vps_services` ya habilita ssh + linger; anadir la regla UDP ahi).
+3. Confirmar el flujo desde la tablet real (depende de la fase Android/Termux).
