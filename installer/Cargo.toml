@@ -2,7 +2,7 @@
 name = "devlab-install"
 version = "0.1.0"
 edition = "2021"
-description = "devlab environment installer: system packages, toolchains, binaries, dotfiles (chezmoi), agent (gentle) and moshi-hook"
+description = "devlab environment installer: system packages, toolchains, binaries, dotfiles (chezmoi), agent (Pi + gentle-ai), skills (prim-skills) and moshi-hook"
 license = "MIT"
 
 [[bin]]

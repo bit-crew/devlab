@@ -3,10 +3,12 @@
 //! Replaces the split shell installer (setup.sh + bootstrap.sh + run_once_*).
 //! This binary OWNS the installation; chezmoi is kept only to apply dotfiles.
 //!
-//! Phase 1a (this file): detect the package manager and architecture, install
-//! system packages from packages/system.txt, create fd/bat symlinks, install
-//! chezmoi, and apply dotfiles. Toolchains, downloaded binaries, gentle and
-//! moshi-hook come in later phases.
+//! What it does: detect the package manager and architecture, install system
+//! packages (embedded from src/data/system.txt), create fd/bat symlinks,
+//! install toolchains (rustup/uv/go) and downloaded binaries (helix, herdr,
+//! lazygit, ...). On the VPS profile it also installs the agent (Pi + gentle-ai),
+//! delegates skills to prim-skills, installs moshi-hook, and enables the OS
+//! services it needs. Finally it installs chezmoi and applies the dotfiles.
 //!
 //! Profile: "vps" or "dc1" (client). Resolved from --profile, else DEVLAB_PROFILE,
 //! else prompt. Non-interactive when stdin is not a TTY.

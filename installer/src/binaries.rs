@@ -804,6 +804,34 @@ fn install_vps_infra(e: &Env, arch: Arch) {
     install_gentle(e, arch);
     configure_pi_settings(e);
     install_moshi(e, arch);
+    configure_vps_services();
+}
+
+/// Enable the OS services Moshi needs to survive on the VPS: the SSH server
+/// running (Moshi connects over SSH/Mosh) and user `linger` so the moshi-hook
+/// systemd *user* service keeps running without an open login session and
+/// restarts after reboot. Both need privileges; tried with `sudo -n`
+/// (passwordless on the VPS). On failure, the exact command is printed to run
+/// by hand. Non-fatal.
+fn configure_vps_services() {
+    // SSH server up (openssh-server is installed from system.txt; enable+start).
+    if !try_sudo(&["systemctl", "enable", "--now", "ssh"]) {
+        note("no se pudo habilitar ssh con sudo; ejecuta: sudo systemctl enable --now ssh");
+    }
+    // Linger: user services persist without a session and across reboots.
+    let user = std::env::var("USER").unwrap_or_default();
+    if user.is_empty() || !try_sudo(&["loginctl", "enable-linger", &user]) {
+        note("no se pudo activar linger con sudo; ejecuta: sudo loginctl enable-linger $USER");
+    } else {
+        note("linger activado: los servicios de usuario sobreviven reboots.");
+    }
+}
+
+/// Run a command via `sudo -n` (non-interactive). Returns success as bool.
+fn try_sudo(args: &[&str]) -> bool {
+    let mut full = vec!["-n"];
+    full.extend_from_slice(args);
+    run_ok("sudo", &full)
 }
 
 /// moshi-hook: the server-side daemon of Moshi (getmoshi.app) — bridges AI
