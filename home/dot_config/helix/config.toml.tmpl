@@ -1,4 +1,8 @@
+{{ if eq .profile "vps" -}}
+theme = "zenbones_warm"
+{{- else -}}
 theme = "catppuccin_mocha"
+{{- end }}
 
 [editor]
 line-number = "relative"

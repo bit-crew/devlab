@@ -1,4 +1,22 @@
 # Datos estaticos disponibles en todas las plantillas chezmoi.
 # Los datos por-maquina (profile, gitName, gitEmail) se preguntan en .chezmoi.toml.tmpl.
-# (Vacio por ahora: el agente ya no se clona desde aqui; lo gestiona el binario
-#  devlab-install via Pi/gentle-ai + prim-skills.)
+
+# ---------------------------------------------------------------------------
+# palette — FUENTE UNICA del tema del ambiente (zenbones "dark warm").
+# Cambia un color aqui y todas las herramientas lo toman: cada plantilla
+# (herdr, helix, lazygit) referencia estos valores via {{ .palette.<key> }}.
+# Base: zenbones_dark (MIT, Michael Chris Lopez) — gris calido + texto hueso.
+# ---------------------------------------------------------------------------
+palette:
+  bg: "#1C1917"      # fondo: gris calido (tinte tierra, no negro)
+  bg_dim: "#211D1B"  # sidebar / statusline / gutter (un pelo mas claro)
+  bg_sel: "#403833"  # seleccion / fila activa / linea actual
+  fg: "#B4BDC3"      # texto hueso / crudo
+  fg_dim: "#8E8E8E"  # comentarios / texto sutil
+  orange: "#D68C67"  # acento principal
+  yellow: "#B77E64"  # amarillo tostado
+  purple: "#B279A7"  # morado
+  red: "#DE6E7C"
+  green: "#819B69"
+  blue: "#6099C0"
+  cyan: "#66A5AD"

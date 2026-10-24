@@ -1,4 +1,17 @@
 gui:
+{{- if eq .profile "vps" }}
+  # Tema desde la paleta central (.chezmoidata.yaml); consistente con herdr/helix.
+  theme:
+    activeBorderColor:
+      - "{{ .palette.orange }}"
+      - bold
+    inactiveBorderColor:
+      - "{{ .palette.fg_dim }}"
+    selectedLineBgColor:
+      - "{{ .palette.bg_sel }}"
+    optionsTextColor:
+      - "{{ .palette.blue }}"
+{{- else }}
   theme:
     activeBorderColor:
       - green
@@ -7,6 +20,7 @@ gui:
       - white
     selectedLineBgColor:
       - reverse
+{{- end }}
   nerdFontsVersion: "3"
   commitLength:
     show: true

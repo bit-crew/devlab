@@ -1,7 +1,7 @@
 {{ if eq .profile "vps" -}}
 # ~/.config/herdr/config.toml — generado por chezmoi. Perfil: {{ .profile }}
-# Tema: zenbones "dark warm" (gris calido + texto hueso + acentos tostados).
-# Paleta base: vesper (built-in calido); [theme.custom] la ajusta a zenbones warm.
+# Tema: zenbones "dark warm". Colores desde la paleta central (.chezmoidata.yaml);
+# cambia un color alli y herdr, helix y lazygit lo toman a la vez.
 
 # Ya elegiste el modo: no vuelvas a mostrar el onboarding.
 onboarding = false
@@ -10,18 +10,18 @@ onboarding = false
 # Base calida con acentos naranja nativos; los tokens de abajo la afinan.
 name = "vesper"
 
-# Override de tokens sobre la base (zenbones dark warm, MIT, Michael Chris Lopez).
+# Override de tokens sobre la base, desde la paleta central.
 [theme.custom]
-panel_bg = "#1C1917"      # fondo: gris calido (tinte tierra, no negro)
-sidebar_bg = "#211D1B"    # barra lateral un pelo mas clara que el fondo
-active_row_bg = "#403833" # fila/agente activo: gris calido
-selection_bg = "#3D4042"  # cursor en modo Navigate
-text = "#B4BDC3"          # texto hueso / crudo
-accent = "#D68C67"        # acento principal: naranja calido
-yellow = "#B77E64"        # amarillo tostado
-red = "#DE6E7C"
-green = "#819B69"
-blue = "#6099C0"
+panel_bg = "{{ .palette.bg }}"
+sidebar_bg = "{{ .palette.bg_dim }}"
+active_row_bg = "{{ .palette.bg_sel }}"
+selection_bg = "{{ .palette.bg_sel }}"
+text = "{{ .palette.fg }}"
+accent = "{{ .palette.orange }}"
+yellow = "{{ .palette.yellow }}"
+red = "{{ .palette.red }}"
+green = "{{ .palette.green }}"
+blue = "{{ .palette.blue }}"
 
 [ui.toast]
 delivery = "herdr"
