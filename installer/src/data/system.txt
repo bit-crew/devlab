@@ -33,8 +33,9 @@ build-essential both    build-essential    build-essential -
 pkg-config      both    pkg-config         pkg-config     pkg-config
 libssl-dev      both    libssl-dev         openssl        openssl
 
-# --- Solo VPS: Data Engineering / infra ---
+# --- Solo VPS: Data Engineering, infra y Moshi (control movil) ---
 openjdk         vps     openjdk-21-jdk     openjdk-21     openjdk@21
 age             vps     age                age            age
 clang           vps     clang              clang          -
 clangd          vps     clangd             clang          -
+mosh            vps     mosh               mosh           mosh
