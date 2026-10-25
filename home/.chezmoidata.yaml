@@ -7,8 +7,8 @@
 # (herdr, helix, lazygit) referencia estos valores via {{ .palette.<key> }}.
 # ---------------------------------------------------------------------------
 palette:
-  bg: "#31312F"      # fondo: gris carbon calido
-  bg_dim: "#292927"  # sidebar / statusline / gutter (un escalon mas oscuro)
+  bg: "#31312F"      # fondo: gris carbon calido (panel y sidebar iguales)
+  bg_dim: "#31312F"  # igual que bg: sidebar sin diferencia visible con el panel
   bg_sel: "#3C3C39"  # seleccion / fila activa / linea actual (un escalon mas claro)
   fg: "#F6F1EA"      # texto crudo calido
   fg_dim: "#A8A39B"  # comentarios / texto sutil
